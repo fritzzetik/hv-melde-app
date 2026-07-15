@@ -6,6 +6,32 @@ struct SettingsView: View {
 
     var body: some View {
         List {
+            Section("iCloud") {
+                Toggle(
+                    "Daten mit iCloud synchronisieren",
+                    isOn: Binding(
+                        get: { store.iCloudSyncEnabled },
+                        set: { store.setICloudSyncEnabled($0) }
+                    )
+                )
+
+                LabeledContent("Status", value: store.iCloudSyncStatus.title)
+                    .font(.caption)
+
+                if store.iCloudSyncEnabled {
+                    Button {
+                        Task { await store.syncWithICloud() }
+                    } label: {
+                        Label("Jetzt synchronisieren", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    .disabled(store.iCloudSyncStatus == .syncing)
+                }
+
+                Text("Profil, Hausverwaltungen, Objekte und Falldaten werden in deinem privaten iCloud-Bereich gespeichert. Fotos und PDFs bleiben in dieser Version ausschließlich auf diesem Gerät.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Lokale KI") {
                 Toggle(
                     "Erweiterte lokale Analyse",

@@ -7,14 +7,36 @@ final class AppDataStore: ObservableObject {
     @Published private(set) var state: AppDataState
     @Published private(set) var lastError: String?
     @Published private(set) var incidentDraft: IncidentDraft?
+    @Published private(set) var iCloudSyncEnabled: Bool
+    @Published private(set) var iCloudSyncStatus: ICloudSyncStatus
 
     private let fileURL: URL
+    private let cloudSyncService = CloudKitSyncService()
+    private var cloudSyncTask: Task<Void, Never>?
+    private var stateModifiedAt: Date
+    private var lastCloudSyncAt: Date?
+    private var isCloudSyncInProgress = false
+
+    private static let cloudSyncEnabledKey = "cloudSyncEnabled"
+    private static let lastCloudSyncAtKey = "lastCloudSyncAt"
 
     init(fileURL: URL? = nil) {
         let resolvedURL = fileURL ?? Self.defaultFileURL
         self.fileURL = resolvedURL
         self.state = Self.load(from: resolvedURL)
         self.incidentDraft = Self.loadDraft(from: Self.draftURL(for: resolvedURL))
+        self.iCloudSyncEnabled = UserDefaults.standard.bool(forKey: Self.cloudSyncEnabledKey)
+        self.lastCloudSyncAt = UserDefaults.standard.object(forKey: Self.lastCloudSyncAtKey) as? Date
+        self.stateModifiedAt = Self.modificationDate(for: resolvedURL) ?? .distantPast
+        self.iCloudSyncStatus = iCloudSyncEnabled ? .checking : .disabled
+
+        if iCloudSyncEnabled {
+            Task { await syncWithICloud() }
+        }
+    }
+
+    deinit {
+        cloudSyncTask?.cancel()
     }
 
     func saveProfile(_ profile: UserProfile) {
@@ -116,6 +138,7 @@ final class AppDataStore: ObservableObject {
                 state.reportedCases.append(storedCase)
             }
             try persistState()
+            scheduleCloudSync()
             lastError = nil
             return permanentPDFURL
         } catch {
@@ -138,6 +161,7 @@ final class AppDataStore: ObservableObject {
 
         do {
             try persistState()
+            scheduleCloudSync()
         } catch {
             state.reportedCases.insert(removedCase, at: index)
             lastError = "Die Meldung konnte nicht gelöscht werden: \(error.localizedDescription)"
@@ -162,6 +186,49 @@ final class AppDataStore: ObservableObject {
 
     func clearError() {
         lastError = nil
+    }
+
+    func setICloudSyncEnabled(_ isEnabled: Bool) {
+        iCloudSyncEnabled = isEnabled
+        UserDefaults.standard.set(isEnabled, forKey: Self.cloudSyncEnabledKey)
+        cloudSyncTask?.cancel()
+        if isEnabled {
+            iCloudSyncStatus = .checking
+            Task { await syncWithICloud() }
+        } else {
+            iCloudSyncStatus = .disabled
+        }
+    }
+
+    func syncWithICloud() async {
+        guard iCloudSyncEnabled else {
+            iCloudSyncStatus = .disabled
+            return
+        }
+
+        guard !isCloudSyncInProgress else { return }
+        isCloudSyncInProgress = true
+        defer { isCloudSyncInProgress = false }
+        iCloudSyncStatus = .syncing
+        do {
+            guard try await cloudSyncService.accountIsAvailable() else {
+                iCloudSyncStatus = .unavailable("Kein aktives iCloud-Konto")
+                return
+            }
+            let result = try await cloudSyncService.synchronize(
+                localState: state,
+                localModifiedAt: stateModifiedAt,
+                lastSyncAt: lastCloudSyncAt
+            )
+            state = result.state
+            try persistState(markAsLocalChange: false)
+            stateModifiedAt = result.synchronizedAt
+            lastCloudSyncAt = result.synchronizedAt
+            UserDefaults.standard.set(result.synchronizedAt, forKey: Self.lastCloudSyncAtKey)
+            iCloudSyncStatus = .ready(lastSync: result.synchronizedAt)
+        } catch {
+            iCloudSyncStatus = .unavailable("iCloud-Fehler: \(error.localizedDescription)")
+        }
     }
 
     func saveDraft(_ draft: IncidentDraft) {
@@ -199,17 +266,31 @@ final class AppDataStore: ObservableObject {
         do {
             try persistState()
             lastError = nil
+            scheduleCloudSync()
         } catch {
             lastError = "Die Einstellungen konnten nicht gespeichert werden: \(error.localizedDescription)"
         }
     }
 
-    private func persistState() throws {
+    private func persistState(markAsLocalChange: Bool = true) throws {
         let directory = fileURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(state).write(to: fileURL, options: [.atomic, .completeFileProtection])
+        if markAsLocalChange {
+            stateModifiedAt = Date()
+        }
+    }
+
+    private func scheduleCloudSync() {
+        guard iCloudSyncEnabled else { return }
+        cloudSyncTask?.cancel()
+        cloudSyncTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            await self?.syncWithICloud()
+        }
     }
 
     private var casesDirectory: URL {
@@ -248,5 +329,9 @@ final class AppDataStore: ObservableObject {
         return baseURL
             .appendingPathComponent("HVMeldeApp", isDirectory: true)
             .appendingPathComponent("app-data.json")
+    }
+
+    private static func modificationDate(for url: URL) -> Date? {
+        try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
     }
 }
