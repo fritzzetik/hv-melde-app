@@ -138,6 +138,15 @@ enum EvidencePhotoStore {
         }.value
     }
 
+    static func deleteAll(for reportID: UUID) async throws {
+        try await Task.detached(priority: .utility) {
+            let directory = try evidenceDirectory(for: reportID)
+            if FileManager.default.fileExists(atPath: directory.path) {
+                try FileManager.default.removeItem(at: directory)
+            }
+        }.value
+    }
+
     private static func evidenceDirectory(for reportID: UUID) throws -> URL {
         let baseURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory

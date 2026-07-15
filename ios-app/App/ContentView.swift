@@ -87,6 +87,7 @@ private struct NewReportView: View {
     @State private var didRestoreDraft = false
     @State private var currentStep: ReportStep = .object
     @State private var suppressNextCategoryReset = false
+    @State private var showsCancelConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -131,6 +132,15 @@ private struct NewReportView: View {
                 }
             }
             .navigationTitle("Neue Meldung")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    if currentDraft.hasMeaningfulContent {
+                        Button("Abbrechen", role: .destructive) {
+                            showsCancelConfirmation = true
+                        }
+                    }
+                }
+            }
             .onAppear(perform: restoreDraftIfNeeded)
             .onChange(of: category) { _, newCategory in
                 if suppressNextCategoryReset {
@@ -160,6 +170,18 @@ private struct NewReportView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(errorMessage ?? store.lastError ?? "Unbekannter Fehler")
+            }
+            .confirmationDialog(
+                "Meldung abbrechen?",
+                isPresented: $showsCancelConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Entwurf und Fotos löschen", role: .destructive) {
+                    cancelDraft()
+                }
+                Button("Weiter bearbeiten", role: .cancel) {}
+            } message: {
+                Text("Alle noch nicht als Fall gespeicherten Angaben und Beweisfotos dieser Meldung werden entfernt.")
             }
         }
     }
@@ -365,6 +387,22 @@ private struct NewReportView: View {
         store.clearDraft()
         hasUnsavedDraft = false
         currentStep = .object
+    }
+
+    private func cancelDraft() {
+        let cancelledReportID = reportID
+        Task {
+            do {
+                try await EvidencePhotoStore.deleteAll(for: cancelledReportID)
+            } catch {
+                await MainActor.run { errorMessage = error.localizedDescription }
+                return
+            }
+            await MainActor.run {
+                resetReport()
+                currentStep = .object
+            }
+        }
     }
 
     private var currentDraft: IncidentDraft {

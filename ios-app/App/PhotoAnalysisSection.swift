@@ -21,13 +21,14 @@ struct PhotoAnalysisSection: View {
     @State private var isImporting = false
     @State private var showsCamera = false
     @State private var errorMessage: String?
+    @State private var importTask: Task<Void, Never>?
 
     var body: some View {
         Section("Foto und lokale Erkennung") {
             PhotosPicker(
                 selection: $selectedItem,
                 matching: .images,
-                preferredItemEncoding: .current
+                preferredItemEncoding: .compatible
             ) {
                 Label(
                     evidencePhotos.isEmpty ? "Foto auswählen" : "Weiteres Foto auswählen",
@@ -49,6 +50,12 @@ struct PhotoAnalysisSection: View {
                 HStack {
                     ProgressView()
                     Text("Originalfoto wird lokal gesichert …")
+                    Spacer()
+                    Button("Abbrechen", role: .cancel) {
+                        importTask?.cancel()
+                        importTask = nil
+                        isImporting = false
+                    }
                 }
             }
 
@@ -117,7 +124,9 @@ struct PhotoAnalysisSection: View {
         }
         .onChange(of: selectedItem) { _, newItem in
             guard let newItem else { return }
-            Task { await loadImage(from: newItem) }
+            selectedItem = nil
+            importTask?.cancel()
+            importTask = Task { await loadImage(from: newItem) }
         }
         .onChange(of: category) { _, _ in
             reviewTarget = nil
@@ -150,6 +159,10 @@ struct PhotoAnalysisSection: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "Unbekannter Fehler")
+        }
+        .onDisappear {
+            importTask?.cancel()
+            importTask = nil
         }
     }
 
@@ -195,15 +208,17 @@ struct PhotoAnalysisSection: View {
         isImporting = true
         defer {
             isImporting = false
-            selectedItem = nil
+            importTask = nil
         }
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else {
                 throw PhotoAnalysisError.imageCouldNotBeLoaded
             }
+            try Task.checkCancellation()
             let fileExtension = item.supportedContentTypes.first?.preferredFilenameExtension
             try await storeLoadedImage(data, source: .photoLibrary, fileExtension: fileExtension)
         } catch {
+            guard !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
     }
