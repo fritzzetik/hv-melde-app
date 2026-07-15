@@ -1,0 +1,6 @@
+# Trainings- und Testbilder können Kennzeichen oder andere personenbezogene Daten enthalten.
+# Deshalb bleiben sämtliche Dateien in diesem Verzeichnis ausschließlich lokal.
+*
+!.gitignore
+!README.md
+
