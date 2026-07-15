@@ -11,6 +11,7 @@ public struct IncidentReport: Codable, Equatable, Identifiable, Sendable {
     public var violation: String
     public var notes: String
     public var witnesses: String
+    public var isCommonArea: Bool
 
     public init(
         id: UUID = UUID(),
@@ -22,7 +23,8 @@ public struct IncidentReport: Codable, Equatable, Identifiable, Sendable {
         vehicleDescription: String = "",
         violation: String,
         notes: String = "",
-        witnesses: String = ""
+        witnesses: String = "",
+        isCommonArea: Bool = false
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -34,6 +36,6 @@ public struct IncidentReport: Codable, Equatable, Identifiable, Sendable {
         self.violation = violation
         self.notes = notes
         self.witnesses = witnesses
+        self.isCommonArea = isCommonArea
     }
 }
-

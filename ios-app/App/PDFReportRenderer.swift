@@ -227,6 +227,7 @@ enum PDFReportRenderer {
             ("Objekt", property.displayName),
             ("Objektanschrift", property.address.formatted),
             ("Nutzungsverhältnis", property.occupancyRole.rawValue),
+            ("Bezug der Meldung", reportScope(for: report, property: property)),
             ("Hausverwaltung", management?.name ?? ""),
             ("Melde-E-Mail", property.reportEmail),
             ("Garagenbereich", report.garageLocation),
@@ -301,6 +302,11 @@ enum PDFReportRenderer {
         formatter.timeZone = .autoupdatingCurrent
         return formatter
     }()
+
+    private static func reportScope(for report: IncidentReport, property: ManagedProperty) -> String {
+        if report.isCommonArea { return "Allgemeinfläche" }
+        return property.occupancyRole == .tenant ? "Gemietetes Objekt" : "Objekt im Eigentum"
+    }
 
     private static let percentFormatter: NumberFormatter = {
         let formatter = NumberFormatter()

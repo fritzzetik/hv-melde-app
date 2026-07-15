@@ -8,6 +8,7 @@ Eine Person dokumentiert einen konkreten Vorfall in einer Garage und erzeugt dar
 
 - Objekt oder Liegenschaft
 - genauer Bereich, Stellplatz oder Garagenebene
+- Bezug zum gemieteten/eigenen Objekt oder zu einer Allgemeinfläche
 - Datum und Uhrzeit des beobachteten Vorfalls
 - Kennzeichen
 - optionale Fahrzeugbeschreibung

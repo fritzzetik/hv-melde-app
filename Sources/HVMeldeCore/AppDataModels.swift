@@ -161,6 +161,7 @@ public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
     public var completedAt: Date?
     public let pdfFileName: String
     public let evidenceSHA256: String?
+    public let isCommonArea: Bool?
 
     public init(
         id: UUID,
@@ -181,7 +182,8 @@ public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
         status: ReportedCaseStatus = .open,
         completedAt: Date? = nil,
         pdfFileName: String,
-        evidenceSHA256: String? = nil
+        evidenceSHA256: String? = nil,
+        isCommonArea: Bool = false
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -202,7 +204,10 @@ public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
         self.completedAt = completedAt
         self.pdfFileName = pdfFileName
         self.evidenceSHA256 = evidenceSHA256
+        self.isCommonArea = isCommonArea
     }
+
+    public var concernsCommonArea: Bool { isCommonArea ?? false }
 }
 
 public struct AppDataState: Codable, Equatable, Sendable {

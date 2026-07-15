@@ -82,6 +82,9 @@ private struct ReportedCaseRow: View {
                 Text(reportedCase.category.rawValue)
                     .font(.headline)
                 Text(reportedCase.propertyName)
+                Text(reportedCase.concernsCommonArea ? "Allgemeinfläche" : reportedCase.occupancyRole.rawValue)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 HStack {
                     Text(reportedCase.incidentAt, format: .dateTime.day().month().year().hour().minute())
                     if !reportedCase.licensePlate.isEmpty {
@@ -132,6 +135,12 @@ private struct ReportedCaseDetailView: View {
                     Section("Objekt") {
                         LabeledContent("Objekt", value: reportedCase.propertyName)
                         LabeledContent("Rolle", value: reportedCase.occupancyRole.rawValue)
+                        LabeledContent(
+                            "Bezug der Meldung",
+                            value: reportedCase.concernsCommonArea
+                                ? "Allgemeinfläche"
+                                : (reportedCase.occupancyRole == .tenant ? "Gemietetes Objekt" : "Objekt im Eigentum")
+                        )
                         Text(reportedCase.propertyAddress.formatted)
                         if !reportedCase.garageLocation.isEmpty {
                             LabeledContent("Bereich", value: reportedCase.garageLocation)

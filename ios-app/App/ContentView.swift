@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var category: ReportCategory = .unauthorizedVehicle
     @State private var incidentAt = Date()
     @State private var garageLocation = ""
+    @State private var isCommonArea = false
     @State private var licensePlate = ""
     @State private var vehicleDescription = ""
     @State private var violation = "Dauerparken"
@@ -48,6 +49,14 @@ struct ContentView: View {
                         if let selectedProperty {
                             LabeledContent("Nutzungsverhältnis", value: selectedProperty.occupancyRole.rawValue)
                         }
+                    }
+
+                    Toggle("Betrifft eine Allgemeinfläche", isOn: $isCommonArea)
+                        .disabled(selectedProperty == nil)
+                    if let selectedProperty {
+                        Text(reportScopeDescription(for: selectedProperty))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
 
                     TextField("Garagenbereich oder Stellplatz", text: $garageLocation)
@@ -185,7 +194,8 @@ struct ContentView: View {
             vehicleDescription: vehicleDescription,
             violation: violation,
             notes: notes,
-            witnesses: witnesses
+            witnesses: witnesses,
+            isCommonArea: isCommonArea
         )
 
         do {
@@ -219,6 +229,7 @@ struct ContentView: View {
         category = .unauthorizedVehicle
         incidentAt = Date()
         garageLocation = ""
+        isCommonArea = false
         licensePlate = ""
         vehicleDescription = ""
         violation = ReportCategory.unauthorizedVehicle.defaultViolation
@@ -228,6 +239,18 @@ struct ContentView: View {
         generatedPDF = nil
         mailDraft = nil
         errorMessage = nil
+    }
+
+    private func reportScopeDescription(for property: ManagedProperty) -> String {
+        if isCommonArea {
+            return "Bezug der Meldung: Allgemeinfläche des ausgewählten Objekts."
+        }
+        switch property.occupancyRole {
+        case .tenant:
+            return "Bezug der Meldung: mein gemietetes Objekt."
+        case .owner:
+            return "Bezug der Meldung: mein Eigentumsobjekt."
+        }
     }
 
     private func prepareMail(pdfURL: URL, recipient: String) {

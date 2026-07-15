@@ -63,7 +63,8 @@ func appDataRoundTrip() throws {
                 violation: "Dauerparken",
                 notes: "",
                 witnesses: "",
-                pdfFileName: "Meldung.pdf"
+                pdfFileName: "Meldung.pdf",
+                isCommonArea: true
             )
         ]
     )
@@ -71,6 +72,35 @@ func appDataRoundTrip() throws {
     let decoded = try JSONDecoder().decode(AppDataState.self, from: JSONEncoder().encode(original))
 
     #expect(decoded == original)
+}
+
+@Test("Bestehender Fall ohne Flächenangabe gilt als objektbezogen")
+func oldCaseWithoutAreaScopeDefaultsToOwnObject() throws {
+    let storedCase = StoredReportedCase(
+        id: UUID(),
+        createdAt: Date(timeIntervalSince1970: 100),
+        incidentAt: Date(timeIntervalSince1970: 50),
+        propertyID: UUID(),
+        propertyName: "Bestandsobjekt",
+        propertyAddress: PostalAddress(),
+        occupancyRole: .tenant,
+        category: .damage,
+        garageLocation: "Stiegenhaus",
+        licensePlate: "",
+        vehicleDescription: "",
+        violation: "Beschädigung",
+        notes: "",
+        witnesses: "",
+        pdfFileName: "Meldung.pdf"
+    )
+    let encoded = try JSONEncoder().encode(storedCase)
+    var json = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    json.removeValue(forKey: "isCommonArea")
+
+    let legacyData = try JSONSerialization.data(withJSONObject: json)
+    let decoded = try JSONDecoder().decode(StoredReportedCase.self, from: legacyData)
+
+    #expect(!decoded.concernsCommonArea)
 }
 
 @Test("Bestehende lokale Daten ohne Rolle und Fallliste bleiben lesbar")
