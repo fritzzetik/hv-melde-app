@@ -15,6 +15,7 @@ Eine Person dokumentiert einen konkreten Vorfall in einer Garage und erzeugt dar
 - sachliche Beschreibung
 - optionale Zeugenangabe
 - automatisch: Erstellungszeitpunkt und eindeutige Meldungs-ID
+- optionales Beweisfoto mit getrennter Aufnahme- und Importzeit
 
 ## MVP-Ablauf
 
@@ -22,7 +23,7 @@ Eine Person dokumentiert einen konkreten Vorfall in einer Garage und erzeugt dar
 2. Hausverwaltungen und mehrere verwaltete Objekte anlegen.
 3. Pro Objekt eine Melde-E-Mail festlegen.
 4. Objekt wählen und Pflichtangaben zum Vorfall erfassen.
-5. Meldekategorie und Foto auswählen.
+5. Meldekategorie wählen und Foto importieren oder direkt aufnehmen.
 6. Foto lokal klassifizieren und mögliche Kennzeichen erkennen lassen.
 7. KI-Vorschläge am Originalfoto prüfen und ausdrücklich bestätigen.
 8. Eingaben lokal validieren und das PDF auf dem Gerät erzeugen.
@@ -37,6 +38,7 @@ Eine Person dokumentiert einen konkreten Vorfall in einer Garage und erzeugt dar
 - keine automatische Übertragung
 - temporäre PDF-Dateien werden nur im App-eigenen Verzeichnis erzeugt
 - Profil-, Objekt- und Verwaltungsdaten werden ausschließlich im App-Verzeichnis gespeichert
+- Beweisfoto und zugehörige Metadaten werden geschützt im App-Verzeichnis gespeichert
 
 ## Abnahmekriterien der ersten Iteration
 
@@ -45,13 +47,14 @@ Eine Person dokumentiert einen konkreten Vorfall in einer Garage und erzeugt dar
 - Die Meldungs-ID und beide Zeitpunkte sind im PDF sichtbar.
 - Ein ausgewähltes Foto wird ausschließlich lokal analysiert.
 - Kennzeichen- und Fahrzeugvorschläge werden nie ohne Bestätigung übernommen.
+- Foto, vollständige SHA-256-Prüfsumme und verfügbare EXIF-Aufnahmezeit erscheinen im PDF.
+- Fehlende EXIF-Aufnahmezeit oder Zeitzone wird sichtbar als solche gekennzeichnet.
 - Das PDF lässt sich über das System-Teilen-Menü weitergeben.
 - Die Kernvalidierung wird automatisiert getestet.
 
 ## Spätere Iterationen
 
-- Originalfotos importieren oder aufnehmen
-- Metadaten und SHA-256-Prüfsummen dokumentieren
 - lokale, verschlüsselte Entwürfe
+- Änderungshistorie und Prüfsumme der strukturierten Meldungsdaten
 - Vorlagen für verschiedene Hausverwaltungen
 - optional qualifizierte Signatur oder vertrauenswürdiger Zeitstempel nach rechtlicher Prüfung

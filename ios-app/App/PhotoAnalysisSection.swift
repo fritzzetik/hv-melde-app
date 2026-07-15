@@ -3,27 +3,55 @@ import HVMeldeCore
 import PhotosUI
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 struct PhotoAnalysisSection: View {
+    let reportID: UUID
     let category: ReportCategory
+    @Binding var evidencePhoto: EvidencePhoto?
     @Binding var licensePlate: String
     @Binding var vehicleDescription: String
     @Binding var notes: String
 
     @State private var selectedItem: PhotosPickerItem?
-    @State private var imageData: Data?
     @State private var analysis: LocalImageAnalysis?
     @State private var reviewAnalysis: LocalImageAnalysis?
     @State private var isAnalyzing = false
+    @State private var isImporting = false
+    @State private var showsCamera = false
     @State private var errorMessage: String?
 
     var body: some View {
         Section("Foto und lokale Erkennung") {
-            PhotosPicker(selection: $selectedItem, matching: .images) {
-                Label(imageData == nil ? "Foto auswählen" : "Anderes Foto auswählen", systemImage: "photo")
+            PhotosPicker(
+                selection: $selectedItem,
+                matching: .images,
+                preferredItemEncoding: .current
+            ) {
+                Label(
+                    evidencePhoto == nil ? "Foto auswählen" : "Anderes Foto auswählen",
+                    systemImage: "photo"
+                )
+            }
+            .disabled(isImporting)
+
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button {
+                    showsCamera = true
+                } label: {
+                    Label("Foto aufnehmen", systemImage: "camera")
+                }
+                .disabled(isImporting)
             }
 
-            if let imageData, let image = UIImage(data: imageData) {
+            if isImporting {
+                HStack {
+                    ProgressView()
+                    Text("Originalfoto wird lokal gesichert …")
+                }
+            }
+
+            if let photo = evidencePhoto, let image = UIImage(data: photo.data) {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
@@ -31,8 +59,10 @@ struct PhotoAnalysisSection: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .accessibilityLabel("Ausgewähltes Beweisfoto")
 
+                evidenceDetails(photo)
+
                 Button {
-                    analyze(imageData)
+                    analyze(photo.data)
                 } label: {
                     if isAnalyzing {
                         HStack {
@@ -54,7 +84,7 @@ struct PhotoAnalysisSection: View {
                 }
             }
 
-            Text("Das Foto verlässt das Gerät nicht. Erkennungen sind Vorschläge und werden erst nach deiner Bestätigung übernommen.")
+            Text("Das Originalfoto wird geschützt auf diesem Gerät gespeichert und verlässt es nicht automatisch. Erkennungen sind Vorschläge und werden erst nach deiner Bestätigung übernommen.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -66,27 +96,63 @@ struct PhotoAnalysisSection: View {
             analysis = nil
             reviewAnalysis = nil
         }
+        .fullScreenCover(isPresented: $showsCamera) {
+            CameraPickerView { data in
+                showsCamera = false
+                Task { await storeImage(data, source: .camera, fileExtension: "jpg") }
+            } onCancel: {
+                showsCamera = false
+            }
+            .ignoresSafeArea()
+        }
         .sheet(item: $reviewAnalysis) { result in
             ImageAnalysisReviewView(
                 analysis: result,
                 currentLicensePlate: licensePlate,
                 currentVehicleDescription: vehicleDescription
             ) { confirmedPlate, confirmedVehicle, confirmedSummary in
-                if !confirmedPlate.isEmpty {
-                    licensePlate = confirmedPlate
-                }
-                if !confirmedVehicle.isEmpty {
-                    vehicleDescription = confirmedVehicle
-                }
-                if notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    notes = confirmedSummary
-                }
+                applyConfirmation(
+                    result,
+                    plate: confirmedPlate,
+                    vehicle: confirmedVehicle,
+                    summary: confirmedSummary
+                )
             }
         }
-        .alert("Bildanalyse fehlgeschlagen", isPresented: errorIsPresented) {
+        .alert("Bildverarbeitung fehlgeschlagen", isPresented: errorIsPresented) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "Unbekannter Fehler")
+        }
+    }
+
+    @ViewBuilder
+    private func evidenceDetails(_ photo: EvidencePhoto) -> some View {
+        LabeledContent("Quelle", value: photo.source.rawValue)
+        if let capturedAt = photo.imageTimestamp.capturedAt {
+            LabeledContent("Bild aufgenommen") {
+                Text(capturedAt, format: .dateTime.day().month().year().hour().minute().second())
+            }
+            if !photo.imageTimestamp.timeZoneWasEmbedded,
+               let timeZone = photo.imageTimestamp.interpretedTimeZone {
+                Text("Die Bilddatei enthält keine Zeitzone; die Aufnahmezeit wurde als \(timeZone) interpretiert.")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        } else {
+            LabeledContent("Bild aufgenommen", value: "Nicht in Metadaten enthalten")
+        }
+        LabeledContent("In App übernommen") {
+            Text(photo.importedAt, format: .dateTime.day().month().year().hour().minute().second())
+        }
+        LabeledContent("SHA-256") {
+            Text(String(photo.sha256.prefix(16)) + "…")
+                .font(.caption.monospaced())
+        }
+        if photo.confirmedAnalysis != nil {
+            Label("Erkennung wurde geprüft und bestätigt", systemImage: "checkmark.seal.fill")
+                .font(.caption)
+                .foregroundStyle(.green)
         }
     }
 
@@ -99,16 +165,49 @@ struct PhotoAnalysisSection: View {
 
     @MainActor
     private func loadImage(from item: PhotosPickerItem) async {
+        isImporting = true
+        defer { isImporting = false }
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else {
                 throw PhotoAnalysisError.imageCouldNotBeLoaded
             }
-            imageData = data
-            analysis = nil
-            errorMessage = nil
+            let fileExtension = item.supportedContentTypes.first?.preferredFilenameExtension
+            try await storeLoadedImage(data, source: .photoLibrary, fileExtension: fileExtension)
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    @MainActor
+    private func storeImage(
+        _ data: Data,
+        source: EvidencePhotoSource,
+        fileExtension: String?
+    ) async {
+        isImporting = true
+        defer { isImporting = false }
+        do {
+            try await storeLoadedImage(data, source: source, fileExtension: fileExtension)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func storeLoadedImage(
+        _ data: Data,
+        source: EvidencePhotoSource,
+        fileExtension: String?
+    ) async throws {
+        evidencePhoto = try await EvidencePhotoStore.store(
+            data: data,
+            reportID: reportID,
+            source: source,
+            fileExtension: fileExtension
+        )
+        analysis = nil
+        reviewAnalysis = nil
+        errorMessage = nil
     }
 
     private func analyze(_ data: Data) {
@@ -127,6 +226,39 @@ struct PhotoAnalysisSection: View {
                     errorMessage = error.localizedDescription
                     isAnalyzing = false
                 }
+            }
+        }
+    }
+
+    private func applyConfirmation(
+        _ result: LocalImageAnalysis,
+        plate: String,
+        vehicle: String,
+        summary: String
+    ) {
+        if !plate.isEmpty { licensePlate = plate }
+        if !vehicle.isEmpty { vehicleDescription = vehicle }
+        if notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            notes = summary
+        }
+
+        guard var photo = evidencePhoto else { return }
+        photo.confirmedAnalysis = ConfirmedImageAnalysis(
+            category: result.category,
+            vehicleDetected: result.vehicle.detected,
+            vehicleConfidence: result.vehicle.confidence,
+            confirmedLicensePlate: plate,
+            confirmedVehicleDescription: vehicle,
+            confirmedSceneSummary: summary,
+            analyzedAt: Date(),
+            analyzerDescription: "Apple Vision: Bildklassifizierung und Texterkennung"
+        )
+        evidencePhoto = photo
+        Task {
+            do {
+                try await EvidencePhotoStore.updateMetadata(for: photo)
+            } catch {
+                await MainActor.run { errorMessage = error.localizedDescription }
             }
         }
     }

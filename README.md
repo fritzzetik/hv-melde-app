@@ -21,9 +21,9 @@ Serverlose iPhone-App zur strukturierten Dokumentation von Vorfällen in verwalt
 
 Über das Zahnrad lassen sich persönliche Absenderdaten, mehrere Objekte und wiederverwendbare Hausverwaltungen lokal hinterlegen. Jedes Objekt besitzt eine eigene Melde-E-Mail-Adresse.
 
-Für die erste lokale Bilderkennungsstufe wählt die Nutzerin oder der Nutzer eine feste Meldekategorie und ein Foto. Apple Vision klassifiziert das Bild und liest mögliche Kennzeichen. Vorschläge werden erst nach manueller Prüfung in die Meldung übernommen; zusätzlich wird die SHA-256-Prüfsumme des Originalbilds angezeigt.
+Für die lokale Bilderkennung wählt die Nutzerin oder der Nutzer eine feste Meldekategorie und importiert ein Foto oder nimmt es direkt auf. Apple Vision klassifiziert das Bild und liest mögliche Kennzeichen. Vorschläge werden erst nach manueller Prüfung in die Meldung übernommen.
 
-Die dauerhafte lokale Fotoablage, Einbindung der Bilder in das PDF und eine nachvollziehbare Änderungshistorie folgen in eigenen Umsetzungsschritten. Der fachliche Umfang steht in [docs/MVP.md](docs/MVP.md), die Leitlinien zum Beweiswert in [docs/EVIDENCE.md](docs/EVIDENCE.md).
+Das der App übergebene Originalbild wird unverändert im geschützten App-Verzeichnis abgelegt. Das PDF enthält das Bild, dessen vollständige SHA-256-Prüfsumme, Importzeitpunkt, verfügbare EXIF-Aufnahmezeit samt Zeitzonenhinweis und die bestätigte lokale Auswertung. Der fachliche Umfang steht in [docs/MVP.md](docs/MVP.md), die Leitlinien zum Beweiswert in [docs/EVIDENCE.md](docs/EVIDENCE.md).
 
 ## Technische Struktur
 
@@ -58,8 +58,7 @@ Die Entwicklung kann unter Windows erfolgen. GitHub Actions übernimmt Pakettest
 
 ## Noch nicht enthalten
 
-- direkte Kameraaufnahme (Fotoauswahl aus der Mediathek ist bereits enthalten)
-- Einbindung der Beweisfotos in das erzeugte PDF
 - lokale Ablage unfertiger Meldungen
+- nachvollziehbare Versions- und Änderungshistorie einer Meldung
 - endgültige App-Store-Veröffentlichung
 - rechtliche Prüfung des Dokumentationsprozesses

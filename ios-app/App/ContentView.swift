@@ -4,6 +4,8 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var store: AppDataStore
+    @State private var reportID = UUID()
+    @State private var reportCreatedAt = Date()
     @State private var selectedPropertyID: UUID?
     @State private var category: ReportCategory = .unauthorizedVehicle
     @State private var incidentAt = Date()
@@ -13,6 +15,7 @@ struct ContentView: View {
     @State private var violation = "Dauerparken"
     @State private var notes = ""
     @State private var witnesses = ""
+    @State private var evidencePhoto: EvidencePhoto?
     @State private var generatedPDF: URL?
     @State private var mailDraft: MailDraft?
     @State private var errorMessage: String?
@@ -59,7 +62,9 @@ struct ContentView: View {
                 }
 
                 PhotoAnalysisSection(
+                    reportID: reportID,
                     category: category,
+                    evidencePhoto: $evidencePhoto,
                     licensePlate: $licensePlate,
                     vehicleDescription: $vehicleDescription,
                     notes: $notes
@@ -110,6 +115,7 @@ struct ContentView: View {
             }
             .onChange(of: store.state.properties) { _, _ in selectFirstPropertyIfNeeded() }
             .onChange(of: selectedPropertyID) { _, _ in generatedPDF = nil }
+            .onChange(of: evidencePhoto?.id) { _, _ in generatedPDF = nil }
             .sheet(item: $mailDraft) { draft in
                 MailComposerView(draft: draft)
             }
@@ -148,6 +154,8 @@ struct ContentView: View {
         }
 
         let report = IncidentReport(
+            id: reportID,
+            createdAt: reportCreatedAt,
             incidentAt: incidentAt,
             propertyName: property.displayName,
             garageLocation: garageLocation,
@@ -164,7 +172,8 @@ struct ContentView: View {
                 report,
                 profile: store.state.profile,
                 property: property,
-                management: store.management(for: property)
+                management: store.management(for: property),
+                evidencePhoto: evidencePhoto
             )
             errorMessage = nil
         } catch let validationError as IncidentReportValidationError {
