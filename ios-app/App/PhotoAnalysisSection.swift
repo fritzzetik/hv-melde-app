@@ -16,6 +16,7 @@ struct PhotoAnalysisSection: View {
 
     @State private var selectedItem: PhotosPickerItem?
     @State private var reviewTarget: ImageAnalysisReviewTarget?
+    @State private var analysisResults: [UUID: LocalImageAnalysis] = [:]
     @State private var analyzingPhotoID: UUID?
     @State private var isAnalyzing = false
     @State private var isImporting = false
@@ -106,6 +107,18 @@ struct PhotoAnalysisSection: View {
                         }
                         .disabled(isAnalyzing || isImporting)
                     }
+
+                    if let result = analysisResults[photo.id] {
+                        Button {
+                            reviewTarget = ImageAnalysisReviewTarget(
+                                photoID: photo.id,
+                                analysis: result
+                            )
+                        } label: {
+                            Label("Erkannte Werte prüfen und übernehmen", systemImage: "checkmark.circle")
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
                 }
             }
 
@@ -130,6 +143,7 @@ struct PhotoAnalysisSection: View {
         }
         .onChange(of: category) { _, _ in
             reviewTarget = nil
+            analysisResults = [:]
         }
         .fullScreenCover(isPresented: $showsCamera) {
             CameraPickerView { data in
@@ -268,7 +282,7 @@ struct PhotoAnalysisSection: View {
                     useEnhancedLocalAnalysis: useEnhancedLocalAnalysis
                 )
                 await MainActor.run {
-                    reviewTarget = ImageAnalysisReviewTarget(photoID: photo.id, analysis: result)
+                    analysisResults[photo.id] = result
                     isAnalyzing = false
                     analyzingPhotoID = nil
                 }
@@ -332,6 +346,7 @@ struct PhotoAnalysisSection: View {
                 try await EvidencePhotoStore.delete(photo)
                 await MainActor.run {
                     evidencePhotos.removeAll { $0.id == photo.id }
+                    analysisResults[photo.id] = nil
                     if reviewTarget?.photoID == photo.id { reviewTarget = nil }
                 }
             } catch {
