@@ -25,12 +25,13 @@ final class AppDataStore: ObservableObject {
         self.fileURL = resolvedURL
         self.state = Self.load(from: resolvedURL)
         self.incidentDraft = Self.loadDraft(from: Self.draftURL(for: resolvedURL))
-        self.iCloudSyncEnabled = UserDefaults.standard.bool(forKey: Self.cloudSyncEnabledKey)
+        let syncEnabled = UserDefaults.standard.bool(forKey: Self.cloudSyncEnabledKey)
+        self.iCloudSyncEnabled = syncEnabled
         self.lastCloudSyncAt = UserDefaults.standard.object(forKey: Self.lastCloudSyncAtKey) as? Date
         self.stateModifiedAt = Self.modificationDate(for: resolvedURL) ?? .distantPast
-        self.iCloudSyncStatus = iCloudSyncEnabled ? .checking : .disabled
+        self.iCloudSyncStatus = syncEnabled ? .checking : .disabled
 
-        if iCloudSyncEnabled {
+        if syncEnabled {
             Task { await syncWithICloud() }
         }
     }
