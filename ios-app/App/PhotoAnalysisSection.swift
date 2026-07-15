@@ -9,14 +9,14 @@ struct PhotoAnalysisSection: View {
     @EnvironmentObject private var store: AppDataStore
     let reportID: UUID
     let category: ReportCategory
-    @Binding var evidencePhoto: EvidencePhoto?
+    @Binding var evidencePhotos: [EvidencePhoto]
     @Binding var licensePlate: String
     @Binding var vehicleDescription: String
     @Binding var notes: String
 
     @State private var selectedItem: PhotosPickerItem?
-    @State private var analysis: LocalImageAnalysis?
-    @State private var reviewAnalysis: LocalImageAnalysis?
+    @State private var reviewTarget: ImageAnalysisReviewTarget?
+    @State private var analyzingPhotoID: UUID?
     @State private var isAnalyzing = false
     @State private var isImporting = false
     @State private var showsCamera = false
@@ -30,11 +30,11 @@ struct PhotoAnalysisSection: View {
                 preferredItemEncoding: .current
             ) {
                 Label(
-                    evidencePhoto == nil ? "Foto auswählen" : "Anderes Foto auswählen",
+                    evidencePhotos.isEmpty ? "Foto auswählen" : "Weiteres Foto auswählen",
                     systemImage: "photo"
                 )
             }
-            .disabled(isImporting || isAnalyzing)
+            .disabled(isImporting || isAnalyzing || evidencePhotos.count >= 10)
 
             if UIImagePickerController.isSourceTypeAvailable(.camera) {
                 Button {
@@ -42,7 +42,7 @@ struct PhotoAnalysisSection: View {
                 } label: {
                     Label("Foto aufnehmen", systemImage: "camera")
                 }
-                .disabled(isImporting || isAnalyzing)
+                .disabled(isImporting || isAnalyzing || evidencePhotos.count >= 10)
             }
 
             if isImporting {
@@ -52,36 +52,53 @@ struct PhotoAnalysisSection: View {
                 }
             }
 
-            if let photo = evidencePhoto, let image = UIImage(data: photo.data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 240)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .accessibilityLabel("Ausgewähltes Beweisfoto")
-
-                evidenceDetails(photo)
-
-                Button {
-                    analyze(photo.data)
-                } label: {
-                    if isAnalyzing {
-                        HStack {
-                            ProgressView()
-                            Text("Wird lokal analysiert …")
-                        }
-                    } else {
-                        Label("Foto lokal analysieren", systemImage: "sparkles")
-                    }
-                }
-                .disabled(isAnalyzing)
+            if evidencePhotos.count >= 10 {
+                Label("Maximal zehn Beweisfotos erreicht", systemImage: "photo.stack")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
-            if let analysis {
-                Button {
-                    reviewAnalysis = analysis
-                } label: {
-                    Label("Erkennung prüfen und übernehmen", systemImage: "checkmark.circle")
+            ForEach(Array(evidencePhotos.enumerated()), id: \.element.id) { index, photo in
+                VStack(alignment: .leading, spacing: 10) {
+                    if let image = UIImage(data: photo.data) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 220)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .accessibilityLabel("Beweisfoto \(index + 1)")
+                    }
+
+                    Text("Beweisfoto \(index + 1)")
+                        .font(.headline)
+                    DisclosureGroup("Technische Angaben") {
+                        evidenceDetails(photo)
+                    }
+
+                    HStack {
+                        Button {
+                            analyze(photo)
+                        } label: {
+                            if analyzingPhotoID == photo.id {
+                                ProgressView()
+                            } else {
+                                Label(
+                                    photo.confirmedAnalysis == nil ? "Analysieren" : "Erneut analysieren",
+                                    systemImage: "sparkles"
+                                )
+                            }
+                        }
+                        .disabled(isAnalyzing)
+
+                        Spacer()
+
+                        Button(role: .destructive) {
+                            remove(photo)
+                        } label: {
+                            Label("Entfernen", systemImage: "trash")
+                        }
+                        .disabled(isAnalyzing || isImporting)
+                    }
                 }
             }
 
@@ -94,7 +111,7 @@ struct PhotoAnalysisSection: View {
                 .foregroundStyle(.secondary)
             }
 
-            Text("Das Originalfoto wird geschützt auf diesem Gerät gespeichert und verlässt es nicht automatisch. Erkennungen sind Vorschläge und werden erst nach deiner Bestätigung übernommen.")
+            Text("Bis zu zehn Originalfotos werden geschützt auf diesem Gerät gespeichert und verlassen es nicht automatisch. Erkennungen sind Vorschläge und werden erst nach deiner Bestätigung übernommen.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -103,8 +120,7 @@ struct PhotoAnalysisSection: View {
             Task { await loadImage(from: newItem) }
         }
         .onChange(of: category) { _, _ in
-            analysis = nil
-            reviewAnalysis = nil
+            reviewTarget = nil
         }
         .fullScreenCover(isPresented: $showsCamera) {
             CameraPickerView { data in
@@ -115,14 +131,15 @@ struct PhotoAnalysisSection: View {
             }
             .ignoresSafeArea()
         }
-        .sheet(item: $reviewAnalysis) { result in
+        .sheet(item: $reviewTarget) { target in
             ImageAnalysisReviewView(
-                analysis: result,
+                analysis: target.analysis,
                 currentLicensePlate: licensePlate,
                 currentVehicleDescription: vehicleDescription
             ) { confirmedPlate, confirmedVehicle, confirmedSummary in
                 applyConfirmation(
-                    result,
+                    target.analysis,
+                    photoID: target.photoID,
                     plate: confirmedPlate,
                     vehicle: confirmedVehicle,
                     summary: confirmedSummary
@@ -212,37 +229,39 @@ struct PhotoAnalysisSection: View {
         source: EvidencePhotoSource,
         fileExtension: String?
     ) async throws {
-        evidencePhoto = try await EvidencePhotoStore.store(
+        let evidencePhoto = try await EvidencePhotoStore.store(
             data: data,
             reportID: reportID,
             source: source,
             fileExtension: fileExtension
         )
-        analysis = nil
-        reviewAnalysis = nil
+        evidencePhotos.append(evidencePhoto)
+        reviewTarget = nil
         errorMessage = nil
     }
 
-    private func analyze(_ data: Data) {
+    private func analyze(_ photo: EvidencePhoto) {
         isAnalyzing = true
+        analyzingPhotoID = photo.id
         errorMessage = nil
         let useEnhancedLocalAnalysis = store.state.preferences.enhancedLocalAnalysisEnabled
         Task {
             do {
                 let result = try await LocalImageAnalyzer.analyze(
-                    imageData: data,
+                    imageData: photo.data,
                     category: category,
                     useEnhancedLocalAnalysis: useEnhancedLocalAnalysis
                 )
                 await MainActor.run {
-                    analysis = result
-                    reviewAnalysis = result
+                    reviewTarget = ImageAnalysisReviewTarget(photoID: photo.id, analysis: result)
                     isAnalyzing = false
+                    analyzingPhotoID = nil
                 }
             } catch {
                 await MainActor.run {
                     errorMessage = error.localizedDescription
                     isAnalyzing = false
+                    analyzingPhotoID = nil
                 }
             }
         }
@@ -250,6 +269,7 @@ struct PhotoAnalysisSection: View {
 
     private func applyConfirmation(
         _ result: LocalImageAnalysis,
+        photoID: UUID,
         plate: String,
         vehicle: String,
         summary: String
@@ -260,7 +280,8 @@ struct PhotoAnalysisSection: View {
             notes = summary
         }
 
-        guard var photo = evidencePhoto else { return }
+        guard let index = evidencePhotos.firstIndex(where: { $0.id == photoID }) else { return }
+        var photo = evidencePhotos[index]
         photo.confirmedAnalysis = ConfirmedImageAnalysis(
             category: result.category,
             vehicleDetected: result.vehicle.detected,
@@ -280,7 +301,7 @@ struct PhotoAnalysisSection: View {
                 ? "Apple Vision mit lokaler Apple-Intelligence-Formulierung; heuristische Farbauswertung"
                 : "Apple Vision: Bildklassifizierung, Texterkennung und Salienz; lokale heuristische Farbauswertung"
         )
-        evidencePhoto = photo
+        evidencePhotos[index] = photo
         Task {
             do {
                 try await EvidencePhotoStore.updateMetadata(for: photo)
@@ -289,6 +310,26 @@ struct PhotoAnalysisSection: View {
             }
         }
     }
+
+    private func remove(_ photo: EvidencePhoto) {
+        Task {
+            do {
+                try await EvidencePhotoStore.delete(photo)
+                await MainActor.run {
+                    evidencePhotos.removeAll { $0.id == photo.id }
+                    if reviewTarget?.photoID == photo.id { reviewTarget = nil }
+                }
+            } catch {
+                await MainActor.run { errorMessage = error.localizedDescription }
+            }
+        }
+    }
+}
+
+private struct ImageAnalysisReviewTarget: Identifiable {
+    let photoID: UUID
+    let analysis: LocalImageAnalysis
+    var id: UUID { analysis.id }
 }
 
 private enum PhotoAnalysisError: LocalizedError {

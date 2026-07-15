@@ -6,6 +6,7 @@ import HVMeldeCore
 final class AppDataStore: ObservableObject {
     @Published private(set) var state: AppDataState
     @Published private(set) var lastError: String?
+    @Published private(set) var incidentDraft: IncidentDraft?
 
     private let fileURL: URL
 
@@ -13,6 +14,7 @@ final class AppDataStore: ObservableObject {
         let resolvedURL = fileURL ?? Self.defaultFileURL
         self.fileURL = resolvedURL
         self.state = Self.load(from: resolvedURL)
+        self.incidentDraft = Self.loadDraft(from: Self.draftURL(for: resolvedURL))
     }
 
     func saveProfile(_ profile: UserProfile) {
@@ -162,6 +164,37 @@ final class AppDataStore: ObservableObject {
         lastError = nil
     }
 
+    func saveDraft(_ draft: IncidentDraft) {
+        if !draft.hasMeaningfulContent {
+            clearDraft()
+            return
+        }
+        do {
+            try FileManager.default.createDirectory(
+                at: fileURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            try encoder.encode(draft).write(to: Self.draftURL(for: fileURL), options: [.atomic, .completeFileProtection])
+            incidentDraft = draft
+        } catch {
+            lastError = "Der Entwurf konnte nicht gespeichert werden: \(error.localizedDescription)"
+        }
+    }
+
+    func clearDraft() {
+        let url = Self.draftURL(for: fileURL)
+        do {
+            if FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.removeItem(at: url)
+            }
+            incidentDraft = nil
+        } catch {
+            lastError = "Der Entwurf konnte nicht entfernt werden: \(error.localizedDescription)"
+        }
+    }
+
     private func persist() {
         do {
             try persistState()
@@ -198,6 +231,15 @@ final class AppDataStore: ObservableObject {
             return AppDataState()
         }
         return state
+    }
+
+    private static func loadDraft(from url: URL) -> IncidentDraft? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(IncidentDraft.self, from: data)
+    }
+
+    private static func draftURL(for stateURL: URL) -> URL {
+        stateURL.deletingLastPathComponent().appendingPathComponent("incident-draft.json")
     }
 
     private static var defaultFileURL: URL {

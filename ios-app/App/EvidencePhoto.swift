@@ -96,6 +96,48 @@ enum EvidencePhotoStore {
         }.value
     }
 
+    static func loadAll(for reportID: UUID) async throws -> [EvidencePhoto] {
+        try await Task.detached(priority: .utility) {
+            let directory = try evidenceDirectory(for: reportID)
+            let metadataURLs = try FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: nil
+            ).filter { $0.lastPathComponent.hasPrefix("metadata-") && $0.pathExtension == "json" }
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return try metadataURLs.compactMap { metadataURL in
+                let metadata = try decoder.decode(EvidencePhotoMetadata.self, from: Data(contentsOf: metadataURL))
+                let imageURL = directory.appendingPathComponent(metadata.fileName)
+                guard FileManager.default.fileExists(atPath: imageURL.path) else { return nil }
+                return EvidencePhoto(
+                    id: metadata.id,
+                    reportID: metadata.reportID,
+                    localURL: imageURL,
+                    data: try Data(contentsOf: imageURL),
+                    sha256: metadata.sha256,
+                    importedAt: metadata.importedAt,
+                    source: metadata.source,
+                    imageTimestamp: metadata.imageTimestamp,
+                    confirmedAnalysis: metadata.confirmedAnalysis
+                )
+            }.sorted { $0.importedAt < $1.importedAt }
+        }.value
+    }
+
+    static func delete(_ photo: EvidencePhoto) async throws {
+        try await Task.detached(priority: .utility) {
+            let metadataURL = photo.localURL
+                .deletingLastPathComponent()
+                .appendingPathComponent("metadata-\(photo.id.uuidString).json")
+            if FileManager.default.fileExists(atPath: photo.localURL.path) {
+                try FileManager.default.removeItem(at: photo.localURL)
+            }
+            if FileManager.default.fileExists(atPath: metadataURL.path) {
+                try FileManager.default.removeItem(at: metadataURL)
+            }
+        }.value
+    }
+
     private static func evidenceDirectory(for reportID: UUID) throws -> URL {
         let baseURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory

@@ -203,7 +203,7 @@ private struct ReportedCaseDetailView: View {
                             detail("Zeugen", value: reportedCase.witnesses)
                         }
                         if let hash = reportedCase.evidenceSHA256 {
-                            detail("SHA-256 des Beweisfotos", value: hash, monospaced: true)
+                            detail("SHA-256 der Beweisfotos", value: hash, monospaced: true)
                         }
                     }
 

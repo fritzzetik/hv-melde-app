@@ -8,13 +8,13 @@ enum PDFReportRenderer {
         profile: UserProfile,
         property: ManagedProperty,
         management: PropertyManagement?,
-        evidencePhoto: EvidencePhoto?
+        evidencePhotos: [EvidencePhoto]
     ) throws -> URL {
         let pageBounds = CGRect(x: 0, y: 0, width: 595, height: 842)
         let renderer = UIGraphicsPDFRenderer(bounds: pageBounds)
-        let hasEvidence = evidencePhoto != nil
-        let hasAnalysis = evidencePhoto?.confirmedAnalysis != nil
-        let totalPages = 2 + (hasEvidence ? 1 : 0) + (hasAnalysis ? 1 : 0)
+        let analysisCount = evidencePhotos.filter { $0.confirmedAnalysis != nil }.count
+        let totalPages = 2 + evidencePhotos.count + analysisCount
+        let attachmentTitles = attachmentSummary(for: evidencePhotos)
         let data = renderer.pdfData { context in
             var pageNumber = 1
             context.beginPage()
@@ -23,8 +23,7 @@ enum PDFReportRenderer {
                 profile: profile,
                 property: property,
                 management: management,
-                hasEvidence: hasEvidence,
-                hasAnalysis: hasAnalysis,
+                attachmentTitles: attachmentTitles,
                 in: pageBounds
             )
             drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
@@ -34,16 +33,19 @@ enum PDFReportRenderer {
             drawCaseDetails(report, profile: profile, property: property, management: management, in: pageBounds)
             drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
 
-            if let evidencePhoto {
+            var attachmentNumber = 2
+            for evidencePhoto in evidencePhotos {
                 pageNumber += 1
                 context.beginPage()
-                drawEvidencePhoto(evidencePhoto, attachmentNumber: 2, in: pageBounds)
+                drawEvidencePhoto(evidencePhoto, attachmentNumber: attachmentNumber, in: pageBounds)
                 drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
+                attachmentNumber += 1
                 if let analysis = evidencePhoto.confirmedAnalysis {
                     pageNumber += 1
                     context.beginPage()
-                    drawConfirmedAnalysis(analysis, attachmentNumber: 3, in: pageBounds)
+                    drawConfirmedAnalysis(analysis, attachmentNumber: attachmentNumber, in: pageBounds)
                     drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
+                    attachmentNumber += 1
                 }
             }
         }
@@ -237,8 +239,7 @@ enum PDFReportRenderer {
         profile: UserProfile,
         property: ManagedProperty,
         management: PropertyManagement?,
-        hasEvidence: Bool,
-        hasAnalysis: Bool,
+        attachmentTitles: [String],
         in bounds: CGRect
     ) {
         let margin: CGFloat = 50
@@ -399,17 +400,30 @@ enum PDFReportRenderer {
             margin: margin
         ) + 18
 
-        var attachments = ["1. Falldetails und Meldungsdaten"]
-        if hasEvidence { attachments.append("2. Beweisfoto und technische Angaben") }
-        if hasAnalysis { attachments.append("3. Bestätigte lokale Bildauswertung") }
         _ = drawText(
-            "Anlagen\n" + attachments.joined(separator: "\n"),
+            "Anlagen\n" + attachmentTitles.joined(separator: "\n"),
             at: y,
             width: contentWidth,
             font: .systemFont(ofSize: 9.5),
             color: .secondaryLabel,
             margin: margin
         )
+    }
+
+    private static func attachmentSummary(for photos: [EvidencePhoto]) -> [String] {
+        var titles = ["1. Falldetails und Meldungsdaten"]
+        guard !photos.isEmpty else { return titles }
+        let analysisCount = photos.filter { $0.confirmedAnalysis != nil }.count
+        let lastNumber = 1 + photos.count + analysisCount
+        var description = "\(photos.count) Beweisfoto"
+        if photos.count != 1 { description += "s" }
+        description += " mit technischen Angaben"
+        if analysisCount > 0 {
+            description += " und \(analysisCount) bestätigte Bildauswertung"
+            if analysisCount != 1 { description += "en" }
+        }
+        titles.append("2–\(lastNumber). \(description)")
+        return titles
     }
 
     private static func drawCaseDetails(
