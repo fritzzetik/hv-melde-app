@@ -34,7 +34,7 @@ struct PhotoAnalysisSection: View {
                     systemImage: "photo"
                 )
             }
-            .disabled(isImporting)
+            .disabled(isImporting || isAnalyzing)
 
             if UIImagePickerController.isSourceTypeAvailable(.camera) {
                 Button {
@@ -42,7 +42,7 @@ struct PhotoAnalysisSection: View {
                 } label: {
                     Label("Foto aufnehmen", systemImage: "camera")
                 }
-                .disabled(isImporting)
+                .disabled(isImporting || isAnalyzing)
             }
 
             if isImporting {
@@ -176,7 +176,10 @@ struct PhotoAnalysisSection: View {
     @MainActor
     private func loadImage(from item: PhotosPickerItem) async {
         isImporting = true
-        defer { isImporting = false }
+        defer {
+            isImporting = false
+            selectedItem = nil
+        }
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else {
                 throw PhotoAnalysisError.imageCouldNotBeLoaded
