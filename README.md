@@ -1,6 +1,6 @@
 # HV Melde App
 
-Serverlose iPhone-App zur strukturierten Dokumentation von Vorfällen in verwalteten Objekten. Die erste Ausbaustufe erzeugt auf dem Gerät ein PDF, das die Nutzerin oder der Nutzer anschließend über das iOS-Teilen-Menü, zum Beispiel per E-Mail, versendet.
+Serverlose iPhone-App zur strukturierten Dokumentation von Vorfällen in verwalteten Objekten. Die App erzeugt auf dem Gerät ein gemeinsames PDF aus einem Geschäftsbrief und nummerierten Anlagen. Es kann anschließend über das iOS-Teilen-Menü, zum Beispiel per E-Mail, versendet werden.
 
 ## Leitplanken
 

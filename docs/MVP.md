@@ -27,7 +27,7 @@ Eine Person dokumentiert einen konkreten Vorfall in einer Garage und erzeugt dar
 5. Meldekategorie wählen und Foto importieren oder direkt aufnehmen.
 6. Foto lokal klassifizieren und mögliche Kennzeichen, Fahrzeugdetails sowie relevante Nebenobjekte erkennen lassen.
 7. KI-Vorschläge am Originalfoto prüfen und ausdrücklich bestätigen.
-8. Eingaben lokal validieren und das PDF auf dem Gerät erzeugen.
+8. Eingaben lokal validieren und einen Geschäftsbrief mit nummerierten PDF-Anlagen auf dem Gerät erzeugen.
 9. Fall und PDF dauerhaft lokal speichern.
 10. Empfänger im Mailfenster vorausfüllen und das PDF anhängen.
 11. Versand ausdrücklich bestätigen oder das PDF anderweitig teilen.

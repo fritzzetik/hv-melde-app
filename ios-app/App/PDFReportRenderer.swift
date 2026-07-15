@@ -12,15 +12,38 @@ enum PDFReportRenderer {
     ) throws -> URL {
         let pageBounds = CGRect(x: 0, y: 0, width: 595, height: 842)
         let renderer = UIGraphicsPDFRenderer(bounds: pageBounds)
+        let hasEvidence = evidencePhoto != nil
+        let hasAnalysis = evidencePhoto?.confirmedAnalysis != nil
+        let totalPages = 2 + (hasEvidence ? 1 : 0) + (hasAnalysis ? 1 : 0)
         let data = renderer.pdfData { context in
+            var pageNumber = 1
             context.beginPage()
-            draw(report, profile: profile, property: property, management: management, in: pageBounds)
+            drawLetter(
+                report,
+                profile: profile,
+                property: property,
+                management: management,
+                hasEvidence: hasEvidence,
+                hasAnalysis: hasAnalysis,
+                in: pageBounds
+            )
+            drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
+
+            pageNumber += 1
+            context.beginPage()
+            drawCaseDetails(report, profile: profile, property: property, management: management, in: pageBounds)
+            drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
+
             if let evidencePhoto {
+                pageNumber += 1
                 context.beginPage()
-                drawEvidencePhoto(evidencePhoto, in: pageBounds)
+                drawEvidencePhoto(evidencePhoto, attachmentNumber: 2, in: pageBounds)
+                drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
                 if let analysis = evidencePhoto.confirmedAnalysis {
+                    pageNumber += 1
                     context.beginPage()
-                    drawConfirmedAnalysis(analysis, in: pageBounds)
+                    drawConfirmedAnalysis(analysis, attachmentNumber: 3, in: pageBounds)
+                    drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
                 }
             }
         }
@@ -31,13 +54,17 @@ enum PDFReportRenderer {
         return url
     }
 
-    private static func drawEvidencePhoto(_ photo: EvidencePhoto, in bounds: CGRect) {
+    private static func drawEvidencePhoto(
+        _ photo: EvidencePhoto,
+        attachmentNumber: Int,
+        in bounds: CGRect
+    ) {
         let margin: CGFloat = 48
         let contentWidth = bounds.width - (2 * margin)
         var y = margin
 
         y = drawText(
-            "Beweisfoto und technische Angaben",
+            "Anlage \(attachmentNumber) - Beweisfoto und technische Angaben",
             at: y,
             width: contentWidth,
             font: .boldSystemFont(ofSize: 20),
@@ -124,6 +151,7 @@ enum PDFReportRenderer {
 
     private static func drawConfirmedAnalysis(
         _ analysis: ConfirmedImageAnalysis,
+        attachmentNumber: Int,
         in bounds: CGRect
     ) {
         let margin: CGFloat = 48
@@ -131,7 +159,7 @@ enum PDFReportRenderer {
         var y = margin
 
         y = drawText(
-            "Bestätigte lokale Bildauswertung",
+            "Anlage \(attachmentNumber) - Bestätigte lokale Bildauswertung",
             at: y,
             width: contentWidth,
             font: .boldSystemFont(ofSize: 20),
@@ -141,7 +169,7 @@ enum PDFReportRenderer {
 
         var rows: [(String, String)] = [
             ("Meldekategorie", analysis.category.rawValue),
-            ("Fahrzeug erkannt", analysis.vehicleDetected ? "Ja (Konfidenz \(percentFormatter.string(from: NSNumber(value: analysis.vehicleConfidence)) ?? "–"))" : "Nein bzw. unsicher"),
+            ("Fahrzeug erkannt", analysis.vehicleDetected ? "Ja (Konfidenz \(percentFormatter.string(from: NSNumber(value: analysis.vehicleConfidence)) ?? "-"))" : "Nein bzw. unsicher"),
             ("Bestätigtes Kennzeichen", analysis.confirmedLicensePlate),
             ("Bestätigte Fahrzeugbeschreibung", analysis.confirmedVehicleDescription),
             ("Bestätigte Szenenbeschreibung", analysis.confirmedSceneSummary),
@@ -197,7 +225,186 @@ enum PDFReportRenderer {
         )
     }
 
-    private static func draw(
+    private static func drawLetter(
+        _ report: IncidentReport,
+        profile: UserProfile,
+        property: ManagedProperty,
+        management: PropertyManagement?,
+        hasEvidence: Bool,
+        hasAnalysis: Bool,
+        in bounds: CGRect
+    ) {
+        let margin: CGFloat = 50
+        let contentWidth = bounds.width - (2 * margin)
+        var y: CGFloat = 34
+
+        let senderLine = [
+            profile.fullName,
+            profile.address.formatted,
+            profile.email,
+            profile.phone
+        ]
+        .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        .joined(separator: " · ")
+        _ = drawText(
+            senderLine,
+            at: y,
+            width: contentWidth - 150,
+            font: .systemFont(ofSize: 7.5),
+            color: .secondaryLabel,
+            margin: margin
+        )
+        drawRightAlignedText(
+            "MELDUNG / DOKUMENTATION",
+            at: y,
+            font: .boldSystemFont(ofSize: 8),
+            color: accentColor,
+            rightMargin: margin,
+            in: bounds
+        )
+        drawLine(at: 54, margin: margin, width: contentWidth, color: accentColor)
+
+        let recipientName = management?.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        var recipientLines = [
+            recipientName?.isEmpty == false ? recipientName! : "An die zuständige Hausverwaltung"
+        ]
+        if let management, !management.address.formatted.isEmpty {
+            recipientLines.append(postalAddressLines(management.address))
+        } else if !property.reportEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            recipientLines.append("per E-Mail: \(property.reportEmail)")
+        }
+
+        y = 78
+        y = drawText(
+            recipientLines.joined(separator: "\n"),
+            at: y,
+            width: 290,
+            font: .systemFont(ofSize: 10.5),
+            color: .label,
+            margin: margin
+        )
+
+        drawRightAlignedText(
+            letterDateFormatter.string(from: report.createdAt),
+            at: max(154, y + 12),
+            font: .systemFont(ofSize: 10.5),
+            color: .label,
+            rightMargin: margin,
+            in: bounds
+        )
+        y = max(198, y + 52)
+
+        y = drawText(
+            "Meldung: \(report.violation) - \(property.displayName)",
+            at: y,
+            width: contentWidth,
+            font: .boldSystemFont(ofSize: 15),
+            color: .label,
+            margin: margin
+        ) + 23
+
+        y = drawText(
+            "Sehr geehrte Damen und Herren,",
+            at: y,
+            width: contentWidth,
+            font: .systemFont(ofSize: 11.5),
+            color: .label,
+            margin: margin
+        ) + 15
+
+        let scopePhrase: String
+        if report.isCommonArea {
+            scopePhrase = "auf einer Allgemeinfläche des unten genannten Objekts"
+        } else if property.occupancyRole == .tenant {
+            scopePhrase = "in meinem gemieteten Objekt"
+        } else {
+            scopePhrase = "in meinem Eigentumsobjekt"
+        }
+        y = drawText(
+            "hiermit informiere ich Sie über einen dokumentierten Vorfall \(scopePhrase). Ich ersuche um Prüfung und gegebenenfalls um die erforderlichen Maßnahmen.",
+            at: y,
+            width: contentWidth,
+            font: .systemFont(ofSize: 11.5),
+            color: .label,
+            margin: margin
+        ) + 16
+
+        var factLines = [
+            "Objekt: \(property.displayName)",
+            "Objektanschrift: \(property.address.formatted)",
+            "Beobachtet: \(dateFormatter.string(from: report.incidentAt))",
+            "Bereich: \(report.garageLocation)",
+            "Meldegrund: \(report.violation)"
+        ]
+        if !report.licensePlate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            factLines.append("Kennzeichen: \(report.licensePlate)")
+        }
+        let boxHeight = CGFloat(factLines.count) * 15 + 20
+        let boxRect = CGRect(x: margin, y: y, width: contentWidth, height: boxHeight)
+        UIColor.secondarySystemBackground.setFill()
+        UIBezierPath(roundedRect: boxRect, cornerRadius: 8).fill()
+        _ = drawText(
+            factLines.joined(separator: "\n"),
+            at: y + 10,
+            width: contentWidth - 24,
+            font: .systemFont(ofSize: 10.5),
+            color: .label,
+            margin: margin + 12
+        )
+        y = boxRect.maxY + 17
+
+        let trimmedNotes = report.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedNotes.isEmpty {
+            y = drawText(
+                "Kurzbeschreibung",
+                at: y,
+                width: contentWidth,
+                font: .boldSystemFont(ofSize: 9),
+                color: .secondaryLabel,
+                margin: margin
+            ) + 4
+            y = drawText(
+                letterSummary(trimmedNotes),
+                at: y,
+                width: contentWidth,
+                font: .systemFont(ofSize: 11),
+                color: .label,
+                margin: margin
+            ) + 15
+        }
+
+        y = drawText(
+            "Die vollständigen Falldaten und - soweit vorhanden - die Foto- und Analysedokumentation finden Sie in den beigefügten Anlagen.",
+            at: y,
+            width: contentWidth,
+            font: .systemFont(ofSize: 11),
+            color: .label,
+            margin: margin
+        ) + 18
+
+        y = drawText(
+            "Mit freundlichen Grüßen\n\n\(profile.fullName)",
+            at: y,
+            width: contentWidth,
+            font: .systemFont(ofSize: 11),
+            color: .label,
+            margin: margin
+        ) + 18
+
+        var attachments = ["1. Falldetails und Meldungsdaten"]
+        if hasEvidence { attachments.append("2. Beweisfoto und technische Angaben") }
+        if hasAnalysis { attachments.append("3. Bestätigte lokale Bildauswertung") }
+        _ = drawText(
+            "Anlagen\n" + attachments.joined(separator: "\n"),
+            at: y,
+            width: contentWidth,
+            font: .systemFont(ofSize: 9.5),
+            color: .secondaryLabel,
+            margin: margin
+        )
+    }
+
+    private static func drawCaseDetails(
         _ report: IncidentReport,
         profile: UserProfile,
         property: ManagedProperty,
@@ -209,13 +416,22 @@ enum PDFReportRenderer {
         var y = margin
 
         y = drawText(
-            "Dokumentation eines Garagenvorfalls",
+            "Anlage 1 - Falldetails und Meldungsdaten",
             at: y,
             width: contentWidth,
             font: .boldSystemFont(ofSize: 20),
             color: .label,
             margin: margin
-        ) + 18
+        ) + 9
+
+        y = drawText(
+            "Strukturierte Zusammenfassung der in der App bestätigten Angaben.",
+            at: y,
+            width: contentWidth,
+            font: .systemFont(ofSize: 9),
+            color: .secondaryLabel,
+            margin: margin
+        ) + 16
 
         let rows: [(String, String)] = [
             ("Meldungs-ID", report.id.uuidString),
@@ -243,28 +459,19 @@ enum PDFReportRenderer {
                 label.uppercased(),
                 at: y,
                 width: contentWidth,
-                font: .boldSystemFont(ofSize: 9),
+                font: .boldSystemFont(ofSize: 8),
                 color: .secondaryLabel,
                 margin: margin
-            ) + 3
+            ) + 2
             y = drawText(
                 value,
                 at: y,
                 width: contentWidth,
-                font: .systemFont(ofSize: 12),
+                font: .systemFont(ofSize: 10.5),
                 color: .label,
                 margin: margin
-            ) + 13
+            ) + 5
         }
-
-        _ = drawText(
-            "Hinweis: Dieses Dokument wurde lokal auf dem Gerät erstellt. Zeitangaben beruhen auf der Geräteuhr. Es wurde kein externer Zeitstempel verwendet.",
-            at: min(y + 12, bounds.height - 100),
-            width: contentWidth,
-            font: .systemFont(ofSize: 9),
-            color: .secondaryLabel,
-            margin: margin
-        )
     }
 
     @discardableResult
@@ -294,11 +501,106 @@ enum PDFReportRenderer {
         return y + size.height
     }
 
+    private static func drawFooter(
+        report: IncidentReport,
+        page: Int,
+        totalPages: Int,
+        in bounds: CGRect
+    ) {
+        let margin: CGFloat = 48
+        let width = bounds.width - (2 * margin)
+        drawLine(at: 786, margin: margin, width: width, color: .systemGray4)
+        _ = drawText(
+            "Lokal erstellt. Kein externer oder qualifizierter Zeitstempel.",
+            at: 794,
+            width: width - 120,
+            font: .systemFont(ofSize: 7),
+            color: .secondaryLabel,
+            margin: margin
+        )
+        _ = drawText(
+            "Meldungs-ID: \(report.id.uuidString)",
+            at: 808,
+            width: width - 90,
+            font: .monospacedSystemFont(ofSize: 6.5, weight: .regular),
+            color: .secondaryLabel,
+            margin: margin
+        )
+        drawRightAlignedText(
+            "Seite \(page) von \(totalPages)",
+            at: 808,
+            font: .systemFont(ofSize: 7),
+            color: .secondaryLabel,
+            rightMargin: margin,
+            in: bounds
+        )
+    }
+
+    private static func drawLine(
+        at y: CGFloat,
+        margin: CGFloat,
+        width: CGFloat,
+        color: UIColor
+    ) {
+        color.setStroke()
+        let path = UIBezierPath()
+        path.lineWidth = 0.7
+        path.move(to: CGPoint(x: margin, y: y))
+        path.addLine(to: CGPoint(x: margin + width, y: y))
+        path.stroke()
+    }
+
+    private static func drawRightAlignedText(
+        _ text: String,
+        at y: CGFloat,
+        font: UIFont,
+        color: UIColor,
+        rightMargin: CGFloat,
+        in bounds: CGRect
+    ) {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: color
+        ]
+        let size = (text as NSString).size(withAttributes: attributes)
+        (text as NSString).draw(
+            at: CGPoint(x: bounds.maxX - rightMargin - size.width, y: y),
+            withAttributes: attributes
+        )
+    }
+
+    private static func postalAddressLines(_ address: PostalAddress) -> String {
+        let cityLine = [address.postalCode, address.city]
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: " ")
+        return [address.street, cityLine, address.country.rawValue]
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: "\n")
+    }
+
+    private static func letterSummary(_ text: String) -> String {
+        let maximumLength = 360
+        guard text.count > maximumLength else { return text }
+        let end = text.index(text.startIndex, offsetBy: maximumLength)
+        return String(text[..<end]) + "… (vollständig in Anlage 1)"
+    }
+
+    private static let accentColor = UIColor(red: 0.08, green: 0.31, blue: 0.52, alpha: 1)
+
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "de_AT")
         formatter.dateStyle = .long
         formatter.timeStyle = .medium
+        formatter.timeZone = .autoupdatingCurrent
+        return formatter
+    }()
+
+    private static let letterDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "de_AT")
+        formatter.dateStyle = .long
+        formatter.timeStyle = .none
         formatter.timeZone = .autoupdatingCurrent
         return formatter
     }()
