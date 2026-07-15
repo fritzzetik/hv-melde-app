@@ -72,7 +72,10 @@ enum LocalImageAnalyzer {
         )
         let vehicle = VehicleAnalysisInterpreter.detectVehicle(in: classificationResults)
         let vehicleType = SceneDetailInterpreter.vehicleType(in: classificationResults)
-        let relevantObjects = SceneDetailInterpreter.relevantObjects(in: classificationResults)
+        let relevantObjects = SceneDetailInterpreter.relevantObjects(
+            in: classificationResults,
+            category: category
+        )
         let plates = LicensePlateParser.candidates(from: textResults)
         let digest = SHA256.hash(data: imageData).map { String(format: "%02x", $0) }.joined()
 

@@ -74,3 +74,34 @@ func weakFurnitureLabelIsRejected() {
 
     #expect(suggestions.isEmpty)
 }
+
+@Test("Unsicheres SUV-Label wird nicht als Fahrzeugtyp vorbefüllt")
+func weakSUVFallsBackToGeneralVehicleType() {
+    let suggestion = SceneDetailInterpreter.vehicleType(in: [
+        ImageClassificationLabel(identifier: "car, motor vehicle", confidence: 0.75),
+        ImageClassificationLabel(identifier: "sport utility vehicle, SUV", confidence: 0.24)
+    ])
+
+    #expect(suggestion?.name == "Pkw")
+    #expect(suggestion?.confidence == 0.75)
+}
+
+@Test("Normale Fahrzeugreifen werden nicht als Nebenobjekt gemeldet")
+func tiresAreSuppressedForVehicleReports() {
+    let suggestions = SceneDetailInterpreter.relevantObjects(
+        in: [ImageClassificationLabel(identifier: "tire, tyre", confidence: 0.40)],
+        category: .unauthorizedVehicle
+    )
+
+    #expect(suggestions.isEmpty)
+}
+
+@Test("Reifen bleiben bei einer Sperrmüllmeldung ein möglicher Treffer")
+func tiresRemainRelevantForWasteReports() {
+    let suggestions = SceneDetailInterpreter.relevantObjects(
+        in: [ImageClassificationLabel(identifier: "tire, tyre", confidence: 0.40)],
+        category: .bulkyWaste
+    )
+
+    #expect(suggestions.first?.name == "Reifen")
+}

@@ -163,18 +163,18 @@ public struct SceneObjectSuggestion: Equatable, Identifiable, Sendable {
 }
 
 public enum SceneDetailInterpreter {
-    private static let vehicleTypes: [(terms: [String], name: String)] = [
-        (["station wagon", "estate car"], "Kombi"),
-        (["hatchback"], "Kompaktwagen / Schrägheck"),
-        (["sport utility", "suv", "jeep"], "SUV"),
-        (["minivan", "passenger van"], "Van"),
-        (["pickup", "pickup truck"], "Pickup"),
-        (["truck", "lorry"], "Lkw"),
-        (["convertible", "cabriolet"], "Cabriolet"),
-        (["coupe", "sports car"], "Coupé / Sportwagen"),
-        (["sedan", "saloon car"], "Limousine"),
-        (["motorcycle", "motorbike"], "Motorrad"),
-        (["car", "automobile", "motor vehicle"], "Pkw")
+    private static let vehicleTypes: [(terms: [String], name: String, minimumConfidence: Float)] = [
+        (["station wagon", "estate car"], "Kombi", 0.45),
+        (["hatchback"], "Kompaktwagen / Schrägheck", 0.45),
+        (["sport utility", "suv", "jeep"], "SUV", 0.45),
+        (["minivan", "passenger van"], "Van", 0.45),
+        (["pickup", "pickup truck"], "Pickup", 0.45),
+        (["truck", "lorry"], "Lkw", 0.45),
+        (["convertible", "cabriolet"], "Cabriolet", 0.45),
+        (["coupe", "sports car"], "Coupé / Sportwagen", 0.45),
+        (["sedan", "saloon car"], "Limousine", 0.45),
+        (["motorcycle", "motorbike"], "Motorrad", 0.45),
+        (["car", "automobile", "motor vehicle"], "Pkw", 0.15)
     ]
 
     private static let sceneObjects: [(terms: [String], name: String, minimumConfidence: Float)] = [
@@ -190,7 +190,8 @@ public enum SceneDetailInterpreter {
 
     public static func vehicleType(in labels: [ImageClassificationLabel]) -> VehicleTypeSuggestion? {
         for mapping in vehicleTypes {
-            if let best = bestMatch(for: mapping.terms, in: labels), best.confidence >= 0.08 {
+            if let best = bestMatch(for: mapping.terms, in: labels),
+               best.confidence >= mapping.minimumConfidence {
                 return VehicleTypeSuggestion(
                     name: mapping.name,
                     confidence: best.confidence,
@@ -201,8 +202,15 @@ public enum SceneDetailInterpreter {
         return nil
     }
 
-    public static func relevantObjects(in labels: [ImageClassificationLabel]) -> [SceneObjectSuggestion] {
+    public static func relevantObjects(
+        in labels: [ImageClassificationLabel],
+        category: ReportCategory? = nil
+    ) -> [SceneObjectSuggestion] {
         sceneObjects.compactMap { mapping in
+            if category?.expectsVehicle == true,
+               mapping.name == "Reifen" || mapping.name == "Fahrrad" {
+                return nil
+            }
             guard let best = bestMatch(for: mapping.terms, in: labels),
                   best.confidence >= mapping.minimumConfidence else {
                 return nil
@@ -224,10 +232,11 @@ public enum SceneDetailInterpreter {
             .filter { label in
                 let normalized = label.identifier.lowercased()
                 return terms.contains { term in
-                    normalized == term ||
-                    normalized.contains(", \(term)") ||
-                    normalized.contains("\(term),") ||
-                    normalized.contains(term)
+                    if term.contains(" ") {
+                        return normalized.contains(term)
+                    }
+                    let words = normalized.split { !$0.isLetter && !$0.isNumber }
+                    return words.contains { String($0) == term }
                 }
             }
             .max { $0.confidence < $1.confidence }
