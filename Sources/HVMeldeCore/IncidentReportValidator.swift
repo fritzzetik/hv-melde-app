@@ -25,7 +25,7 @@ public enum IncidentReportValidator {
         if report.garageLocation.trimmedIsEmpty {
             missingFields.append(.garageLocation)
         }
-        if report.licensePlate.trimmedIsEmpty {
+        if report.category.expectsVehicle && report.licensePlate.trimmedIsEmpty {
             missingFields.append(.licensePlate)
         }
         if report.violation.trimmedIsEmpty {
@@ -43,4 +43,3 @@ private extension String {
         trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
-

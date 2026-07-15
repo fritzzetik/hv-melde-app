@@ -247,10 +247,10 @@ struct PhotoAnalysisSection: View {
             category: result.category,
             vehicleDetected: result.vehicle.detected,
             vehicleConfidence: result.vehicle.confidence,
-            suggestedVehicleType: result.vehicleType?.name,
-            suggestedVehicleTypeConfidence: result.vehicleType?.confidence,
-            suggestedVehicleColor: result.vehicleColor?.name,
-            suggestedVehicleColorConfidence: result.vehicleColor?.confidence,
+            suggestedVehicleType: result.category.expectsVehicle ? result.vehicleType?.name : nil,
+            suggestedVehicleTypeConfidence: result.category.expectsVehicle ? result.vehicleType?.confidence : nil,
+            suggestedVehicleColor: result.category.expectsVehicle ? result.vehicleColor?.name : nil,
+            suggestedVehicleColorConfidence: result.category.expectsVehicle ? result.vehicleColor?.confidence : nil,
             suggestedSceneObjects: result.relevantObjects.map {
                 ImageAnalysisObjectRecord(name: $0.name, confidence: $0.confidence)
             },
@@ -312,7 +312,8 @@ private struct ImageAnalysisReviewView: View {
                     Text(analysis.category.rawValue)
                 }
 
-                Section("Fahrzeug") {
+                if analysis.category.expectsVehicle {
+                    Section("Fahrzeug") {
                     LabeledContent("Erkannt") {
                         Label(
                             analysis.vehicle.detected ? "Ja" : "Unsicher",
@@ -345,19 +346,20 @@ private struct ImageAnalysisReviewView: View {
                             .foregroundStyle(.secondary)
                     }
                     TextField("Bestätigte Fahrzeugbeschreibung", text: $vehicleDescription)
-                }
-
-                Section("Kennzeichen") {
-                    TextField("Kennzeichen prüfen", text: $licensePlate)
-                        .textInputAutocapitalization(.characters)
-                    ForEach(analysis.plateCandidates.dropFirst()) { candidate in
-                        Button("Alternative übernehmen: \(candidate.text)") {
-                            licensePlate = candidate.text
-                        }
                     }
-                    if analysis.plateCandidates.isEmpty {
-                        Text("Kein plausibles Kennzeichen erkannt.")
-                            .foregroundStyle(.secondary)
+
+                    Section("Kennzeichen") {
+                        TextField("Kennzeichen prüfen", text: $licensePlate)
+                            .textInputAutocapitalization(.characters)
+                        ForEach(analysis.plateCandidates.dropFirst()) { candidate in
+                            Button("Alternative übernehmen: \(candidate.text)") {
+                                licensePlate = candidate.text
+                            }
+                        }
+                        if analysis.plateCandidates.isEmpty {
+                            Text("Kein plausibles Kennzeichen erkannt.")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 

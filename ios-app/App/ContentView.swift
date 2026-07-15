@@ -63,15 +63,17 @@ struct ContentView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    TextField("Garagenbereich oder Stellplatz", text: $garageLocation)
+                    TextField("Bereich oder Ort im Objekt", text: $garageLocation)
                     DatePicker("Beobachtet am", selection: $incidentAt)
                 }
 
-                Section("Fahrzeug und Vorfall") {
-                    TextField("Kennzeichen", text: $licensePlate)
-                        .textInputAutocapitalization(.characters)
-                    TextField("Fahrzeugbeschreibung (optional)", text: $vehicleDescription)
-                    TextField("Art des Verstoßes", text: $violation)
+                Section(category.expectsVehicle ? "Fahrzeug und Vorfall" : "Vorfall") {
+                    if category.expectsVehicle {
+                        TextField("Kennzeichen", text: $licensePlate)
+                            .textInputAutocapitalization(.characters)
+                        TextField("Fahrzeugbeschreibung (optional)", text: $vehicleDescription)
+                    }
+                    TextField("Meldegrund", text: $violation)
                     TextField("Sachliche Beschreibung (optional)", text: $notes, axis: .vertical)
                         .lineLimit(3...8)
                     TextField("Zeugen (optional)", text: $witnesses)
@@ -142,6 +144,11 @@ struct ContentView: View {
             .onAppear(perform: selectFirstPropertyIfNeeded)
             .onChange(of: category) { _, newCategory in
                 violation = newCategory.defaultViolation
+                generatedPDF = nil
+                if !newCategory.expectsVehicle {
+                    licensePlate = ""
+                    vehicleDescription = ""
+                }
             }
             .onChange(of: store.state.properties) { _, _ in selectFirstPropertyIfNeeded() }
             .onChange(of: selectedPropertyID) { _, _ in generatedPDF = nil }
@@ -199,7 +206,8 @@ struct ContentView: View {
             violation: violation,
             notes: notes,
             witnesses: witnesses,
-            isCommonArea: isCommonArea
+            isCommonArea: isCommonArea,
+            category: category
         )
 
         do {
@@ -286,9 +294,9 @@ struct ContentView: View {
     private func fieldLabel(_ field: IncidentReportField) -> String {
         switch field {
         case .propertyName: "Objekt"
-        case .garageLocation: "Garagenbereich"
+        case .garageLocation: "Bereich oder Ort im Objekt"
         case .licensePlate: "Kennzeichen"
-        case .violation: "Art des Verstoßes"
+        case .violation: "Meldegrund"
         }
     }
 }

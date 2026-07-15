@@ -32,3 +32,16 @@ func whitespaceOnlyFieldsAreRejected() {
     }
 }
 
+@Test("Nicht fahrzeugbezogene Meldung benötigt kein Kennzeichen")
+func nonVehicleReportDoesNotRequirePlate() throws {
+    let report = IncidentReport(
+        incidentAt: Date(timeIntervalSince1970: 1_700_000_000),
+        propertyName: "Musterobjekt",
+        garageLocation: "Stiegenhaus",
+        licensePlate: "",
+        violation: "Beschädigte Beleuchtung",
+        category: .damage
+    )
+
+    try IncidentReportValidator.validate(report)
+}

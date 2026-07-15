@@ -30,23 +30,25 @@ struct LocalImageAnalysis: Identifiable, Sendable {
     var sceneSummary: String {
         var sentences: [String] = []
 
-        if vehicle.detected {
-            sentences.append("Auf dem Foto wurde ein Fahrzeug erkannt.")
-        } else if category.expectsVehicle {
-            sentences.append("Auf dem Foto wurde kein Fahrzeug mit ausreichender Sicherheit erkannt.")
-        }
+        if category.expectsVehicle {
+            if vehicle.detected {
+                sentences.append("Auf dem Foto wurde ein Fahrzeug erkannt.")
+            } else {
+                sentences.append("Auf dem Foto wurde kein Fahrzeug mit ausreichender Sicherheit erkannt.")
+            }
 
-        if let vehicleType {
-            sentences.append("Als möglicher Fahrzeugtyp wurde \(vehicleType.name) erkannt.")
-        }
-        if let vehicleColor {
-            sentences.append("Die Fahrzeugfarbe wird heuristisch als \(vehicleColor.name) geschätzt.")
-        }
+            if let vehicleType {
+                sentences.append("Als möglicher Fahrzeugtyp wurde \(vehicleType.name) erkannt.")
+            }
+            if let vehicleColor {
+                sentences.append("Die Fahrzeugfarbe wird heuristisch als \(vehicleColor.name) geschätzt.")
+            }
 
-        if let plate = plateCandidates.first {
-            sentences.append("Als mögliches Kennzeichen wurde \(plate.text) gelesen.")
-        } else if category.expectsVehicle {
-            sentences.append("Es wurde kein ausreichend plausibles Kennzeichen gelesen.")
+            if let plate = plateCandidates.first {
+                sentences.append("Als mögliches Kennzeichen wurde \(plate.text) gelesen.")
+            } else {
+                sentences.append("Es wurde kein ausreichend plausibles Kennzeichen gelesen.")
+            }
         }
 
         if !relevantObjects.isEmpty {
@@ -70,20 +72,25 @@ enum LocalImageAnalyzer {
             recognizedTexts,
             vehicleColor
         )
-        let vehicle = VehicleAnalysisInterpreter.detectVehicle(in: classificationResults)
-        let vehicleType = SceneDetailInterpreter.vehicleType(in: classificationResults)
+        let detectedVehicle = VehicleAnalysisInterpreter.detectVehicle(in: classificationResults)
+        let vehicle = category.expectsVehicle
+            ? detectedVehicle
+            : VehicleDetection(detected: false, confidence: 0)
+        let vehicleType = category.expectsVehicle
+            ? SceneDetailInterpreter.vehicleType(in: classificationResults)
+            : nil
         let relevantObjects = SceneDetailInterpreter.relevantObjects(
             in: classificationResults,
             category: category
         )
-        let plates = LicensePlateParser.candidates(from: textResults)
+        let plates = category.expectsVehicle ? LicensePlateParser.candidates(from: textResults) : []
         let digest = SHA256.hash(data: imageData).map { String(format: "%02x", $0) }.joined()
 
         return LocalImageAnalysis(
             category: category,
             vehicle: vehicle,
             vehicleType: vehicleType,
-            vehicleColor: vehicle.detected ? colorResult : nil,
+            vehicleColor: category.expectsVehicle && vehicle.detected ? colorResult : nil,
             relevantObjects: relevantObjects,
             plateCandidates: plates,
             classifications: classificationResults,

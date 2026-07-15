@@ -167,34 +167,41 @@ enum PDFReportRenderer {
             margin: margin
         ) + 18
 
-        var rows: [(String, String)] = [
-            ("Meldekategorie", analysis.category.rawValue),
-            ("Fahrzeug erkannt", analysis.vehicleDetected ? "Ja (Konfidenz \(percentFormatter.string(from: NSNumber(value: analysis.vehicleConfidence)) ?? "-"))" : "Nein bzw. unsicher"),
-            ("Bestätigtes Kennzeichen", analysis.confirmedLicensePlate),
-            ("Bestätigte Fahrzeugbeschreibung", analysis.confirmedVehicleDescription),
-            ("Bestätigte Szenenbeschreibung", analysis.confirmedSceneSummary),
-            ("Analyse bestätigt", dateFormatter.string(from: analysis.analyzedAt)),
-            ("Analyseverfahren", analysis.analyzerDescription)
-        ]
+        var rows: [(String, String)] = [("Meldekategorie", analysis.category.rawValue)]
 
-        if let type = analysis.suggestedVehicleType {
-            rows.insert(
-                ("Automatisch vorgeschlagener Fahrzeugtyp", suggestionValue(type, confidence: analysis.suggestedVehicleTypeConfidence)),
-                at: 2
-            )
-        }
-        if let color = analysis.suggestedVehicleColor {
-            rows.insert(
-                ("Heuristisch geschätzte Fahrzeugfarbe", suggestionValue(color, confidence: analysis.suggestedVehicleColorConfidence)),
-                at: min(3, rows.count)
-            )
+        if analysis.category.expectsVehicle {
+            rows.append((
+                "Fahrzeug erkannt",
+                analysis.vehicleDetected
+                    ? "Ja (Konfidenz \(percentFormatter.string(from: NSNumber(value: analysis.vehicleConfidence)) ?? "-"))"
+                    : "Nein bzw. unsicher"
+            ))
+            if let type = analysis.suggestedVehicleType {
+                rows.append((
+                    "Automatisch vorgeschlagener Fahrzeugtyp",
+                    suggestionValue(type, confidence: analysis.suggestedVehicleTypeConfidence)
+                ))
+            }
+            if let color = analysis.suggestedVehicleColor {
+                rows.append((
+                    "Heuristisch geschätzte Fahrzeugfarbe",
+                    suggestionValue(color, confidence: analysis.suggestedVehicleColorConfidence)
+                ))
+            }
         }
         if !analysis.suggestedSceneObjects.isEmpty {
             let values = analysis.suggestedSceneObjects.map {
                 suggestionValue($0.name, confidence: $0.confidence)
             }
-            rows.insert(("Automatisch vorgeschlagene Nebenobjekte", values.joined(separator: ", ")), at: min(4, rows.count))
+            rows.append(("Automatisch vorgeschlagene Objekte", values.joined(separator: ", ")))
         }
+        if analysis.category.expectsVehicle {
+            rows.append(("Bestätigtes Kennzeichen", analysis.confirmedLicensePlate))
+            rows.append(("Bestätigte Fahrzeugbeschreibung", analysis.confirmedVehicleDescription))
+        }
+        rows.append(("Bestätigte Szenenbeschreibung", analysis.confirmedSceneSummary))
+        rows.append(("Analyse bestätigt", dateFormatter.string(from: analysis.analyzedAt)))
+        rows.append(("Analyseverfahren", analysis.analyzerDescription))
 
         for (label, value) in rows where !value.isEmpty {
             y = drawText(
@@ -449,7 +456,7 @@ enum PDFReportRenderer {
             ("Bezug der Meldung", reportScope(for: report, property: property)),
             ("Hausverwaltung", management?.name ?? ""),
             ("Melde-E-Mail", property.reportEmail),
-            ("Garagenbereich", report.garageLocation),
+            ("Bereich / Ort", report.garageLocation),
             ("Kennzeichen", report.licensePlate),
             ("Fahrzeug", report.vehicleDescription),
             ("Verstoß", report.violation),
