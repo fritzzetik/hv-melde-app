@@ -32,10 +32,13 @@ jobs:
       - name: Simulator-Build
         run: |
           set -o pipefail
-          xcodebuild build \
-            -project HVMeldeApp.xcodeproj \
-            -scheme HVMeldeApp \
-            -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO \
-            | xcbeautify --renderer github-actions
-
+          if ! xcodebuild build \
+              -project HVMeldeApp.xcodeproj \
+              -scheme HVMeldeApp \
+              -destination 'generic/platform=iOS Simulator' \
+              CODE_SIGNING_ALLOWED=NO \
+              2>&1 | tee xcodebuild.log | xcbeautify --renderer github-actions; then
+            grep -E "error:|BUILD FAILED" xcodebuild.log | head -40 \
+              | while IFS= read -r line; do echo "::error::$line"; done
+            exit 1
+          fi
