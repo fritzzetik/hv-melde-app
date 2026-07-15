@@ -21,7 +21,9 @@ Serverlose iPhone-App zur strukturierten Dokumentation von Vorfällen in verwalt
 
 Über das Zahnrad lassen sich persönliche Absenderdaten, mehrere Objekte und wiederverwendbare Hausverwaltungen lokal hinterlegen. Jedes Objekt besitzt eine eigene Melde-E-Mail-Adresse.
 
-Fotos, Prüfsummen und eine nachvollziehbare Änderungshistorie folgen in einem eigenen Umsetzungsschritt. Der fachliche Umfang steht in [docs/MVP.md](docs/MVP.md), die Leitlinien zum Beweiswert in [docs/EVIDENCE.md](docs/EVIDENCE.md).
+Für die erste lokale Bilderkennungsstufe wählt die Nutzerin oder der Nutzer eine feste Meldekategorie und ein Foto. Apple Vision klassifiziert das Bild und liest mögliche Kennzeichen. Vorschläge werden erst nach manueller Prüfung in die Meldung übernommen; zusätzlich wird die SHA-256-Prüfsumme des Originalbilds angezeigt.
+
+Die dauerhafte lokale Fotoablage, Einbindung der Bilder in das PDF und eine nachvollziehbare Änderungshistorie folgen in eigenen Umsetzungsschritten. Der fachliche Umfang steht in [docs/MVP.md](docs/MVP.md), die Leitlinien zum Beweiswert in [docs/EVIDENCE.md](docs/EVIDENCE.md).
 
 ## Technische Struktur
 
@@ -37,6 +39,7 @@ Fotos, Prüfsummen und eine nachvollziehbare Änderungshistorie folgen in einem 
 
 - `HVMeldeCore`: Datenmodell und Validierung ohne UI-Abhängigkeiten
 - `ios-app/App`: SwiftUI-Oberfläche und PDF-Ausgabe mit iOS-Frameworks
+- `LocalImageAnalyzer`: lokale Apple-Vision-Klassifizierung und Kennzeichen-OCR
 - lokale Stammdaten als JSON im geschützten App-Verzeichnis
 - XcodeGen erzeugt das Xcode-Projekt aus `project.yml`; das generierte Projekt wird nicht eingecheckt
 - `.github/workflows/testflight.yml`: manueller, signierter Upload zu TestFlight
@@ -55,8 +58,8 @@ Die Entwicklung kann unter Windows erfolgen. GitHub Actions übernimmt Pakettest
 
 ## Noch nicht enthalten
 
-- Fotoaufnahme und Import aus der Mediathek
+- direkte Kameraaufnahme (Fotoauswahl aus der Mediathek ist bereits enthalten)
+- Einbindung der Beweisfotos in das erzeugte PDF
 - lokale Ablage unfertiger Meldungen
-- kryptografische Prüfsummen
-- TestFlight- und App-Store-Veröffentlichung
+- endgültige App-Store-Veröffentlichung
 - rechtliche Prüfung des Dokumentationsprozesses

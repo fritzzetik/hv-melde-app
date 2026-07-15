@@ -22,9 +22,12 @@ Eine Person dokumentiert einen konkreten Vorfall in einer Garage und erzeugt dar
 2. Hausverwaltungen und mehrere verwaltete Objekte anlegen.
 3. Pro Objekt eine Melde-E-Mail festlegen.
 4. Objekt wählen und Pflichtangaben zum Vorfall erfassen.
-5. Eingaben lokal validieren und das PDF auf dem Gerät erzeugen.
-6. Empfänger im Mailfenster vorausfüllen und das PDF anhängen.
-7. Versand ausdrücklich bestätigen oder das PDF anderweitig teilen.
+5. Meldekategorie und Foto auswählen.
+6. Foto lokal klassifizieren und mögliche Kennzeichen erkennen lassen.
+7. KI-Vorschläge am Originalfoto prüfen und ausdrücklich bestätigen.
+8. Eingaben lokal validieren und das PDF auf dem Gerät erzeugen.
+9. Empfänger im Mailfenster vorausfüllen und das PDF anhängen.
+10. Versand ausdrücklich bestätigen oder das PDF anderweitig teilen.
 
 ## Datenschutzgrenze
 
@@ -40,6 +43,8 @@ Eine Person dokumentiert einen konkreten Vorfall in einer Garage und erzeugt dar
 - Leere Pflichtfelder verhindern die PDF-Erzeugung und werden verständlich benannt.
 - Sonderzeichen und mehrzeilige Texte erscheinen korrekt im PDF.
 - Die Meldungs-ID und beide Zeitpunkte sind im PDF sichtbar.
+- Ein ausgewähltes Foto wird ausschließlich lokal analysiert.
+- Kennzeichen- und Fahrzeugvorschläge werden nie ohne Bestätigung übernommen.
 - Das PDF lässt sich über das System-Teilen-Menü weitergeben.
 - Die Kernvalidierung wird automatisiert getestet.
 

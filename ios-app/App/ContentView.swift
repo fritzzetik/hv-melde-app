@@ -5,6 +5,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var store: AppDataStore
     @State private var selectedPropertyID: UUID?
+    @State private var category: ReportCategory = .unauthorizedVehicle
     @State private var incidentAt = Date()
     @State private var garageLocation = ""
     @State private var licensePlate = ""
@@ -19,6 +20,14 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("Meldekategorie") {
+                    Picker("Kategorie", selection: $category) {
+                        ForEach(ReportCategory.allCases) { category in
+                            Text(category.rawValue).tag(category)
+                        }
+                    }
+                }
+
                 Section("Ort und Zeitpunkt") {
                     if store.state.properties.isEmpty {
                         ContentUnavailableView(
@@ -48,6 +57,13 @@ struct ContentView: View {
                         .lineLimit(3...8)
                     TextField("Zeugen (optional)", text: $witnesses)
                 }
+
+                PhotoAnalysisSection(
+                    category: category,
+                    licensePlate: $licensePlate,
+                    vehicleDescription: $vehicleDescription,
+                    notes: $notes
+                )
 
                 Section {
                     Button("PDF erzeugen", action: generatePDF)
@@ -89,6 +105,9 @@ struct ContentView: View {
                 }
             }
             .onAppear(perform: selectFirstPropertyIfNeeded)
+            .onChange(of: category) { _, newCategory in
+                violation = newCategory.defaultViolation
+            }
             .onChange(of: store.state.properties) { _, _ in selectFirstPropertyIfNeeded() }
             .onChange(of: selectedPropertyID) { _, _ in generatedPDF = nil }
             .sheet(item: $mailDraft) { draft in
@@ -190,4 +209,3 @@ private extension String {
         return value.isEmpty ? nil : value
     }
 }
-
