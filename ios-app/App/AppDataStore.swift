@@ -130,6 +130,27 @@ final class AppDataStore: ObservableObject {
         persist()
     }
 
+    func deleteReportedCase(_ id: UUID) {
+        guard let index = state.reportedCases.firstIndex(where: { $0.id == id }) else { return }
+        let removedCase = state.reportedCases.remove(at: index)
+
+        do {
+            try persistState()
+        } catch {
+            state.reportedCases.insert(removedCase, at: index)
+            lastError = "Die Meldung konnte nicht gelöscht werden: \(error.localizedDescription)"
+            return
+        }
+
+        do {
+            try removeDirectoryIfPresent(casesDirectory.appendingPathComponent(id.uuidString, isDirectory: true))
+            try removeDirectoryIfPresent(evidenceDirectory.appendingPathComponent(id.uuidString, isDirectory: true))
+            lastError = nil
+        } catch {
+            lastError = "Die Meldung wurde aus der Liste gelöscht, aber nicht alle lokalen Dateien konnten entfernt werden: \(error.localizedDescription)"
+        }
+    }
+
     func pdfURL(for reportedCase: StoredReportedCase) -> URL? {
         let url = casesDirectory
             .appendingPathComponent(reportedCase.id.uuidString, isDirectory: true)
@@ -160,6 +181,15 @@ final class AppDataStore: ObservableObject {
 
     private var casesDirectory: URL {
         fileURL.deletingLastPathComponent().appendingPathComponent("Cases", isDirectory: true)
+    }
+
+    private var evidenceDirectory: URL {
+        fileURL.deletingLastPathComponent().appendingPathComponent("Evidence", isDirectory: true)
+    }
+
+    private func removeDirectoryIfPresent(_ url: URL) throws {
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        try FileManager.default.removeItem(at: url)
     }
 
     private static func load(from url: URL) -> AppDataState {

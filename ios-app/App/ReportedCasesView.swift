@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ReportedCasesView: View {
     @EnvironmentObject private var store: AppDataStore
+    @State private var casePendingDeletion: StoredReportedCase?
 
     var body: some View {
         List {
@@ -18,7 +19,23 @@ struct ReportedCasesView: View {
             }
         }
         .navigationTitle("Gemeldete Fälle")
-        .alert("Speichern fehlgeschlagen", isPresented: errorIsPresented) {
+        .confirmationDialog(
+            "Meldung löschen?",
+            isPresented: deletionIsPresented,
+            titleVisibility: .visible
+        ) {
+            Button("Meldung endgültig löschen", role: .destructive) {
+                guard let reportedCase = casePendingDeletion else { return }
+                store.deleteReportedCase(reportedCase.id)
+                casePendingDeletion = nil
+            }
+            Button("Abbrechen", role: .cancel) {
+                casePendingDeletion = nil
+            }
+        } message: {
+            Text("Der Fall, das gespeicherte PDF und die lokalen Beweisdateien werden von diesem Gerät entfernt.")
+        }
+        .alert("Aktion fehlgeschlagen", isPresented: errorIsPresented) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(store.lastError ?? "Unbekannter Fehler")
@@ -52,6 +69,13 @@ struct ReportedCasesView: View {
                             .tint(.orange)
                         }
                     }
+                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                        Button(role: .destructive) {
+                            casePendingDeletion = reportedCase
+                        } label: {
+                            Label("Löschen", systemImage: "trash")
+                        }
+                    }
                 }
             }
         }
@@ -67,6 +91,13 @@ struct ReportedCasesView: View {
         Binding(
             get: { store.lastError != nil },
             set: { if !$0 { store.clearError() } }
+        )
+    }
+
+    private var deletionIsPresented: Binding<Bool> {
+        Binding(
+            get: { casePendingDeletion != nil },
+            set: { if !$0 { casePendingDeletion = nil } }
         )
     }
 }
@@ -106,6 +137,7 @@ private struct ReportedCaseRow: View {
 private struct ReportedCaseDetailView: View {
     @EnvironmentObject private var store: AppDataStore
     let caseID: UUID
+    @State private var mailDraft: MailDraft?
 
     var body: some View {
         Group {
@@ -177,6 +209,11 @@ private struct ReportedCaseDetailView: View {
 
                     if let pdfURL = store.pdfURL(for: reportedCase) {
                         Section("PDF") {
+                            Button {
+                                mailDraft = copyMailDraft(for: reportedCase, pdfURL: pdfURL)
+                            } label: {
+                                Label("PDF erneut per Mail senden", systemImage: "envelope")
+                            }
                             ShareLink(item: pdfURL) {
                                 Label("Gespeichertes PDF teilen", systemImage: "square.and.arrow.up")
                             }
@@ -189,10 +226,38 @@ private struct ReportedCaseDetailView: View {
         }
         .navigationTitle("Falldetails")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $mailDraft) { draft in
+            MailComposerView(draft: draft)
+        }
     }
 
     private var reportedCase: StoredReportedCase? {
         store.state.reportedCases.first { $0.id == caseID }
+    }
+
+    private func copyMailDraft(for reportedCase: StoredReportedCase, pdfURL: URL) -> MailDraft {
+        let recipient = store.state.properties
+            .first(where: { $0.id == reportedCase.propertyID })?
+            .reportEmail
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        var details = [reportedCase.garageLocation.trimmingCharacters(in: .whitespacesAndNewlines)]
+            .filter { !$0.isEmpty }
+        if !reportedCase.licensePlate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            details.append("Kennzeichen \(reportedCase.licensePlate)")
+        }
+        if details.isEmpty {
+            let summary = reportedCase.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+            details.append(summary.isEmpty ? "Details siehe PDF" : String(summary.prefix(60)))
+        }
+
+        let subject = "\(reportedCase.recipientPropertyName) - \(reportedCase.violation) - \(details.joined(separator: ", ")) - (KOPIE)"
+        return MailDraft(
+            recipients: recipient.map { [$0] } ?? [],
+            subject: subject,
+            body: "Anbei übermittle ich erneut eine Kopie der bereits erstellten Meldung.",
+            attachmentURL: pdfURL
+        )
     }
 
     @ViewBuilder
