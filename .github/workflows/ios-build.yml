@@ -38,6 +38,8 @@ jobs:
               -destination 'generic/platform=iOS Simulator' \
               CODE_SIGNING_ALLOWED=NO \
               2>&1 | tee xcodebuild.log | xcbeautify --renderer github-actions; then
+            echo "Letzte Zeilen des Xcode-Rohlogs:"
+            tail -250 xcodebuild.log
             grep -E "error:|BUILD FAILED" xcodebuild.log | head -40 \
               | while IFS= read -r line; do echo "::error::$line"; done
             exit 1
