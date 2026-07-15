@@ -1,0 +1,24 @@
+name: Core CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-core:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift-Package testen
+        run: |
+          set -o pipefail
+          if ! swift test --parallel 2>&1 | tee test.log; then
+            grep -E "recorded an issue|error:" test.log | head -40 \
+              | while IFS= read -r line; do echo "::error::$line"; done
+            exit 1
+          fi
+

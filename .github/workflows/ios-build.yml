@@ -1,0 +1,41 @@
+name: iOS Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ios-app/**"
+      - "Sources/**"
+      - "Package.swift"
+      - "project.yml"
+      - ".github/workflows/ios-build.yml"
+  pull_request:
+    paths:
+      - "ios-app/**"
+      - "Sources/**"
+      - "Package.swift"
+      - "project.yml"
+      - ".github/workflows/ios-build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  simulator-build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: XcodeGen installieren
+        run: brew install xcodegen
+      - name: Xcode-Projekt erzeugen
+        run: xcodegen generate
+      - name: Simulator-Build
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project HVMeldeApp.xcodeproj \
+            -scheme HVMeldeApp \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions
+

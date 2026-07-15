@@ -1,0 +1,23 @@
+# Xcode
+DerivedData/
+build/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcuserstate
+
+# XcodeGen (generated in CI)
+HVMeldeApp.xcodeproj/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# macOS / Windows
+.DS_Store
+Thumbs.db
+
+# Local secrets
+.env
+*.p8
+
