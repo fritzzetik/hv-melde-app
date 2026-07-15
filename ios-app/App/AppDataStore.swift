@@ -20,6 +20,11 @@ final class AppDataStore: ObservableObject {
         persist()
     }
 
+    func setEnhancedLocalAnalysisEnabled(_ isEnabled: Bool) {
+        state.preferences.enhancedLocalAnalysisEnabled = isEnabled
+        persist()
+    }
+
     func upsert(_ property: ManagedProperty) {
         if let index = state.properties.firstIndex(where: { $0.id == property.id }) {
             state.properties[index] = property

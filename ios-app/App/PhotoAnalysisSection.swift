@@ -6,6 +6,7 @@ import UIKit
 import UniformTypeIdentifiers
 
 struct PhotoAnalysisSection: View {
+    @EnvironmentObject private var store: AppDataStore
     let reportID: UUID
     let category: ReportCategory
     @Binding var evidencePhoto: EvidencePhoto?
@@ -82,6 +83,15 @@ struct PhotoAnalysisSection: View {
                 } label: {
                     Label("Erkennung prüfen und übernehmen", systemImage: "checkmark.circle")
                 }
+            }
+
+            if store.state.preferences.enhancedLocalAnalysisEnabled {
+                Label(
+                    LocalIntelligenceService.availability.settingsDescription,
+                    systemImage: "sparkles"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
 
             Text("Das Originalfoto wird geschützt auf diesem Gerät gespeichert und verlässt es nicht automatisch. Erkennungen sind Vorschläge und werden erst nach deiner Bestätigung übernommen.")
@@ -213,9 +223,14 @@ struct PhotoAnalysisSection: View {
     private func analyze(_ data: Data) {
         isAnalyzing = true
         errorMessage = nil
+        let useEnhancedLocalAnalysis = store.state.preferences.enhancedLocalAnalysisEnabled
         Task {
             do {
-                let result = try await LocalImageAnalyzer.analyze(imageData: data, category: category)
+                let result = try await LocalImageAnalyzer.analyze(
+                    imageData: data,
+                    category: category,
+                    useEnhancedLocalAnalysis: useEnhancedLocalAnalysis
+                )
                 await MainActor.run {
                     analysis = result
                     reviewAnalysis = result
@@ -258,7 +273,9 @@ struct PhotoAnalysisSection: View {
             confirmedVehicleDescription: vehicle,
             confirmedSceneSummary: summary,
             analyzedAt: Date(),
-            analyzerDescription: "Apple Vision: Bildklassifizierung, Texterkennung und Salienz; lokale heuristische Farbauswertung"
+            analyzerDescription: result.localIntelligenceOutcome == .applied
+                ? "Apple Vision mit lokaler Apple-Intelligence-Formulierung; heuristische Farbauswertung"
+                : "Apple Vision: Bildklassifizierung, Texterkennung und Salienz; lokale heuristische Farbauswertung"
         )
         evidencePhoto = photo
         Task {
@@ -366,6 +383,14 @@ private struct ImageAnalysisReviewView: View {
                 Section("Beschreibungsvorschlag") {
                     TextField("Beschreibung", text: $sceneSummary, axis: .vertical)
                         .lineLimit(3...8)
+                }
+
+                if let description = analysis.localIntelligenceOutcome.description {
+                    Section("Erweiterte lokale Analyse") {
+                        Text(description)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 if !analysis.relevantObjects.isEmpty {

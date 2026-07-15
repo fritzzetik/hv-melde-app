@@ -6,6 +6,21 @@ struct SettingsView: View {
 
     var body: some View {
         List {
+            Section("Lokale KI") {
+                Toggle(
+                    "Erweiterte lokale Analyse",
+                    isOn: Binding(
+                        get: { store.state.preferences.enhancedLocalAnalysisEnabled },
+                        set: store.setEnhancedLocalAnalysisEnabled
+                    )
+                )
+                LabeledContent("Apple Intelligence", value: LocalIntelligenceService.availability.settingsDescription)
+                    .font(.caption)
+                Text("Wenn verfügbar, formuliert Apples Modell auf dem Gerät aus den Vision-Ergebnissen einen besseren Beschreibungsvorschlag. Fotos werden nicht an OpenAI oder andere externe Anbieter gesendet.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Persönliche Daten") {
                 NavigationLink {
                     ProfileEditorView(profile: store.state.profile)

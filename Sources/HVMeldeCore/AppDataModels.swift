@@ -279,21 +279,24 @@ public struct AppDataState: Codable, Equatable, Sendable {
     public var properties: [ManagedProperty]
     public var propertyManagements: [PropertyManagement]
     public var reportedCases: [StoredReportedCase]
+    public var preferences: AppPreferences
 
     public init(
         profile: UserProfile = UserProfile(),
         properties: [ManagedProperty] = [],
         propertyManagements: [PropertyManagement] = [],
-        reportedCases: [StoredReportedCase] = []
+        reportedCases: [StoredReportedCase] = [],
+        preferences: AppPreferences = AppPreferences()
     ) {
         self.profile = profile
         self.properties = properties
         self.propertyManagements = propertyManagements
         self.reportedCases = reportedCases
+        self.preferences = preferences
     }
 
     private enum CodingKeys: String, CodingKey {
-        case profile, properties, propertyManagements, reportedCases
+        case profile, properties, propertyManagements, reportedCases, preferences
     }
 
     public init(from decoder: Decoder) throws {
@@ -302,6 +305,15 @@ public struct AppDataState: Codable, Equatable, Sendable {
         properties = try container.decodeIfPresent([ManagedProperty].self, forKey: .properties) ?? []
         propertyManagements = try container.decodeIfPresent([PropertyManagement].self, forKey: .propertyManagements) ?? []
         reportedCases = try container.decodeIfPresent([StoredReportedCase].self, forKey: .reportedCases) ?? []
+        preferences = try container.decodeIfPresent(AppPreferences.self, forKey: .preferences) ?? AppPreferences()
+    }
+}
+
+public struct AppPreferences: Codable, Equatable, Sendable {
+    public var enhancedLocalAnalysisEnabled: Bool
+
+    public init(enhancedLocalAnalysisEnabled: Bool = false) {
+        self.enhancedLocalAnalysisEnabled = enhancedLocalAnalysisEnabled
     }
 }
 

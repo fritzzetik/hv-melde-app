@@ -25,6 +25,8 @@ Erzeugte Meldungen werden mit ihrem PDF dauerhaft im geschützten App-Verzeichni
 
 Für die lokale Bilderkennung wählt die Nutzerin oder der Nutzer eine feste Meldekategorie und importiert ein Foto oder nimmt es direkt auf. Apple Vision klassifiziert das Bild und liest mögliche Kennzeichen. Die zweite Erkennungsstufe schlägt zusätzlich Fahrzeugtyp, eine heuristisch bestimmte Farbe und relevante Nebenobjekte wie Matratze oder Sperrmüll vor. Vorschläge werden erst nach manueller Prüfung in die Meldung übernommen.
 
+Optional kann in den Einstellungen die erweiterte lokale Analyse aktiviert werden. Auf kompatiblen Geräten formuliert das Apple-Intelligence-Modell aus den lokalen Vision-Ergebnissen einen sachlichen Beschreibungsvorschlag. Ist das Modell nicht verfügbar, verwendet die App automatisch ausschließlich die bestehende Vision-Erkennung. Es werden keine Fotos oder Analysedaten an OpenAI oder andere externe Anbieter übertragen.
+
 Das der App übergebene Originalbild wird unverändert im geschützten App-Verzeichnis abgelegt. Das PDF enthält das Bild, dessen vollständige SHA-256-Prüfsumme, Importzeitpunkt, verfügbare EXIF-Aufnahmezeit samt Zeitzonenhinweis und die bestätigte lokale Auswertung. Der fachliche Umfang steht in [docs/MVP.md](docs/MVP.md), die Leitlinien zum Beweiswert in [docs/EVIDENCE.md](docs/EVIDENCE.md).
 
 ## Technische Struktur

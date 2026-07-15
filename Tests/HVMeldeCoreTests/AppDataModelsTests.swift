@@ -85,7 +85,8 @@ func appDataRoundTrip() throws {
                 officialPropertyName: "Wohnanlage Musterhof",
                 propertyType: .apartment
             )
-        ]
+        ],
+        preferences: AppPreferences(enhancedLocalAnalysisEnabled: true)
     )
 
     let decoded = try JSONDecoder().decode(AppDataState.self, from: JSONEncoder().encode(original))
@@ -132,6 +133,7 @@ func oldAppDataMigratesWithDefaults() throws {
     let encoded = try JSONEncoder().encode(oldState)
     var json = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
     json.removeValue(forKey: "reportedCases")
+    json.removeValue(forKey: "preferences")
     var properties = try #require(json["properties"] as? [[String: Any]])
     properties[0].removeValue(forKey: "occupancyRole")
     properties[0].removeValue(forKey: "officialName")
@@ -152,4 +154,5 @@ func oldAppDataMigratesWithDefaults() throws {
     #expect(decoded.properties.first?.address.houseNumber == "")
     #expect(decoded.properties.first?.address.unit == "")
     #expect(decoded.reportedCases.isEmpty)
+    #expect(!decoded.preferences.enhancedLocalAnalysisEnabled)
 }

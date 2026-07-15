@@ -14,6 +14,8 @@ struct LocalImageAnalysis: Identifiable, Sendable {
     let classifications: [ImageClassificationLabel]
     let recognizedTexts: [OCRTextCandidate]
     let imageSHA256: String
+    let enhancedSceneSummary: String?
+    let localIntelligenceOutcome: LocalIntelligenceOutcome
 
     var suggestedVehicleDescription: String {
         guard vehicle.detected else { return "" }
@@ -28,6 +30,10 @@ struct LocalImageAnalysis: Identifiable, Sendable {
     }
 
     var sceneSummary: String {
+        if let enhancedSceneSummary {
+            return enhancedSceneSummary
+        }
+
         var sentences: [String] = []
 
         if category.expectsVehicle {
@@ -62,7 +68,11 @@ struct LocalImageAnalysis: Identifiable, Sendable {
 }
 
 enum LocalImageAnalyzer {
-    static func analyze(imageData: Data, category: ReportCategory) async throws -> LocalImageAnalysis {
+    static func analyze(
+        imageData: Data,
+        category: ReportCategory,
+        useEnhancedLocalAnalysis: Bool = false
+    ) async throws -> LocalImageAnalysis {
         async let classifications = classify(imageData: imageData)
         async let recognizedTexts = recognizeText(imageData: imageData)
         async let vehicleColor = VehicleColorAnalyzer.analyze(imageData: imageData)
@@ -85,6 +95,25 @@ enum LocalImageAnalyzer {
         )
         let plates = category.expectsVehicle ? LicensePlateParser.candidates(from: textResults) : []
         let digest = SHA256.hash(data: imageData).map { String(format: "%02x", $0) }.joined()
+        var enhancedSceneSummary: String?
+        var intelligenceOutcome: LocalIntelligenceOutcome = useEnhancedLocalAnalysis ? .unavailable : .disabled
+        if useEnhancedLocalAnalysis {
+            do {
+                enhancedSceneSummary = try await LocalIntelligenceService.refineSceneSummary(
+                    category: category,
+                    vehicle: vehicle,
+                    vehicleType: vehicleType,
+                    vehicleColor: category.expectsVehicle && vehicle.detected ? colorResult : nil,
+                    relevantObjects: relevantObjects,
+                    plateCandidates: plates,
+                    classifications: classificationResults,
+                    recognizedTexts: textResults
+                )
+                intelligenceOutcome = enhancedSceneSummary == nil ? .unavailable : .applied
+            } catch {
+                intelligenceOutcome = .failed
+            }
+        }
 
         return LocalImageAnalysis(
             category: category,
@@ -95,7 +124,9 @@ enum LocalImageAnalyzer {
             plateCandidates: plates,
             classifications: classificationResults,
             recognizedTexts: textResults,
-            imageSHA256: digest
+            imageSHA256: digest,
+            enhancedSceneSummary: enhancedSceneSummary,
+            localIntelligenceOutcome: intelligenceOutcome
         )
     }
 
