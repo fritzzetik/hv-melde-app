@@ -464,7 +464,7 @@ private struct NewReportView: View {
 }
 
 private enum ReportStep: Int, CaseIterable {
-    case object, incident, photos, review
+    case object, photos, incident, review
 
     var title: String {
         switch self {
