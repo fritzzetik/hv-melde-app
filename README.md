@@ -35,6 +35,7 @@ Fotos, Prüfsummen und eine nachvollziehbare Änderungshistorie folgen in einem 
 - `HVMeldeCore`: Datenmodell und Validierung ohne UI-Abhängigkeiten
 - `ios-app/App`: SwiftUI-Oberfläche und PDF-Ausgabe mit iOS-Frameworks
 - XcodeGen erzeugt das Xcode-Projekt aus `project.yml`; das generierte Projekt wird nicht eingecheckt
+- `.github/workflows/testflight.yml`: manueller, signierter Upload zu TestFlight
 
 ## Lokale Entwicklung
 
@@ -55,4 +56,3 @@ Die Entwicklung kann unter Windows erfolgen. GitHub Actions übernimmt Pakettest
 - kryptografische Prüfsummen
 - TestFlight- und App-Store-Veröffentlichung
 - rechtliche Prüfung des Dokumentationsprozesses
-
