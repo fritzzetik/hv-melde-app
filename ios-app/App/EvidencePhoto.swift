@@ -11,11 +11,21 @@ struct ConfirmedImageAnalysis: Codable, Equatable, Sendable {
     let category: ReportCategory
     let vehicleDetected: Bool
     let vehicleConfidence: Float
+    let suggestedVehicleType: String?
+    let suggestedVehicleTypeConfidence: Float?
+    let suggestedVehicleColor: String?
+    let suggestedVehicleColorConfidence: Float?
+    let suggestedSceneObjects: [ImageAnalysisObjectRecord]
     let confirmedLicensePlate: String
     let confirmedVehicleDescription: String
     let confirmedSceneSummary: String
     let analyzedAt: Date
     let analyzerDescription: String
+}
+
+struct ImageAnalysisObjectRecord: Codable, Equatable, Sendable {
+    let name: String
+    let confidence: Float
 }
 
 struct EvidencePhoto: Identifiable, Sendable {

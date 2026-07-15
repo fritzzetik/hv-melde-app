@@ -43,3 +43,34 @@ func garageAloneIsNotAVehicle() {
 
     #expect(!detection.detected)
 }
+
+@Test("Spezifischer Fahrzeugtyp wird vor allgemeinem Pkw-Label verwendet")
+func specificVehicleTypeIsPreferred() {
+    let suggestion = SceneDetailInterpreter.vehicleType(in: [
+        ImageClassificationLabel(identifier: "car, motor vehicle", confidence: 0.92),
+        ImageClassificationLabel(identifier: "hatchback", confidence: 0.71)
+    ])
+
+    #expect(suggestion?.name == "Kompaktwagen / Schrägheck")
+    #expect(suggestion?.confidence == 0.71)
+}
+
+@Test("Matratze wird als relevantes Nebenobjekt vorgeschlagen")
+func mattressIsRelevantSceneObject() {
+    let suggestions = SceneDetailInterpreter.relevantObjects(in: [
+        ImageClassificationLabel(identifier: "parking garage", confidence: 0.94),
+        ImageClassificationLabel(identifier: "mattress, bedding", confidence: 0.18)
+    ])
+
+    #expect(suggestions.first?.name == "Matratze")
+    #expect(suggestions.first?.confidence == 0.18)
+}
+
+@Test("Niedrige generische Möbel-Konfidenz wird nicht vorgeschlagen")
+func weakFurnitureLabelIsRejected() {
+    let suggestions = SceneDetailInterpreter.relevantObjects(in: [
+        ImageClassificationLabel(identifier: "furniture", confidence: 0.02)
+    ])
+
+    #expect(suggestions.isEmpty)
+}

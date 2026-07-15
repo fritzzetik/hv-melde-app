@@ -247,11 +247,18 @@ struct PhotoAnalysisSection: View {
             category: result.category,
             vehicleDetected: result.vehicle.detected,
             vehicleConfidence: result.vehicle.confidence,
+            suggestedVehicleType: result.vehicleType?.name,
+            suggestedVehicleTypeConfidence: result.vehicleType?.confidence,
+            suggestedVehicleColor: result.vehicleColor?.name,
+            suggestedVehicleColorConfidence: result.vehicleColor?.confidence,
+            suggestedSceneObjects: result.relevantObjects.map {
+                ImageAnalysisObjectRecord(name: $0.name, confidence: $0.confidence)
+            },
             confirmedLicensePlate: plate,
             confirmedVehicleDescription: vehicle,
             confirmedSceneSummary: summary,
             analyzedAt: Date(),
-            analyzerDescription: "Apple Vision: Bildklassifizierung und Texterkennung"
+            analyzerDescription: "Apple Vision: Bildklassifizierung, Texterkennung und Salienz; lokale heuristische Farbauswertung"
         )
         evidencePhoto = photo
         Task {
@@ -292,7 +299,7 @@ private struct ImageAnalysisReviewView: View {
         _licensePlate = State(initialValue: analysis.plateCandidates.first?.text ?? currentLicensePlate)
         _vehicleDescription = State(
             initialValue: currentVehicleDescription.isEmpty && analysis.vehicle.detected
-                ? "Pkw"
+                ? analysis.suggestedVehicleDescription
                 : currentVehicleDescription
         )
         _sceneSummary = State(initialValue: analysis.sceneSummary)
@@ -314,6 +321,29 @@ private struct ImageAnalysisReviewView: View {
                         .foregroundStyle(analysis.vehicle.detected ? .green : .orange)
                     }
                     LabeledContent("Konfidenz", value: analysis.vehicle.confidence, format: .percent.precision(.fractionLength(0)))
+                    if let vehicleType = analysis.vehicleType {
+                        LabeledContent("Vorgeschlagener Typ") {
+                            VStack(alignment: .trailing) {
+                                Text(vehicleType.name)
+                                Text(vehicleType.confidence, format: .percent.precision(.fractionLength(0)))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    if let vehicleColor = analysis.vehicleColor {
+                        LabeledContent("Geschätzte Farbe") {
+                            VStack(alignment: .trailing) {
+                                Text(vehicleColor.name)
+                                Text(vehicleColor.confidence, format: .percent.precision(.fractionLength(0)))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Text("Die Farbe wird aus dem auffälligen Bildbereich berechnet und kann durch Licht, Schatten oder Hintergrund verfälscht sein.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     TextField("Bestätigte Fahrzeugbeschreibung", text: $vehicleDescription)
                 }
 
@@ -334,6 +364,17 @@ private struct ImageAnalysisReviewView: View {
                 Section("Beschreibungsvorschlag") {
                     TextField("Beschreibung", text: $sceneSummary, axis: .vertical)
                         .lineLimit(3...8)
+                }
+
+                if !analysis.relevantObjects.isEmpty {
+                    Section("Weitere mögliche Objekte") {
+                        ForEach(analysis.relevantObjects) { object in
+                            LabeledContent(object.name, value: object.confidence, format: .percent.precision(.fractionLength(0)))
+                        }
+                        Text("Auch diese Treffer sind nur Vorschläge. Übernimm sie nur, wenn sie auf dem Originalfoto eindeutig sichtbar sind.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Section("Technische Nachvollziehbarkeit") {

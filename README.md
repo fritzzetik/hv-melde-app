@@ -21,7 +21,7 @@ Serverlose iPhone-App zur strukturierten Dokumentation von Vorfällen in verwalt
 
 Über das Zahnrad lassen sich persönliche Absenderdaten, mehrere Objekte und wiederverwendbare Hausverwaltungen lokal hinterlegen. Jedes Objekt besitzt eine eigene Melde-E-Mail-Adresse.
 
-Für die lokale Bilderkennung wählt die Nutzerin oder der Nutzer eine feste Meldekategorie und importiert ein Foto oder nimmt es direkt auf. Apple Vision klassifiziert das Bild und liest mögliche Kennzeichen. Vorschläge werden erst nach manueller Prüfung in die Meldung übernommen.
+Für die lokale Bilderkennung wählt die Nutzerin oder der Nutzer eine feste Meldekategorie und importiert ein Foto oder nimmt es direkt auf. Apple Vision klassifiziert das Bild und liest mögliche Kennzeichen. Die zweite Erkennungsstufe schlägt zusätzlich Fahrzeugtyp, eine heuristisch bestimmte Farbe und relevante Nebenobjekte wie Matratze oder Sperrmüll vor. Vorschläge werden erst nach manueller Prüfung in die Meldung übernommen.
 
 Das der App übergebene Originalbild wird unverändert im geschützten App-Verzeichnis abgelegt. Das PDF enthält das Bild, dessen vollständige SHA-256-Prüfsumme, Importzeitpunkt, verfügbare EXIF-Aufnahmezeit samt Zeitzonenhinweis und die bestätigte lokale Auswertung. Der fachliche Umfang steht in [docs/MVP.md](docs/MVP.md), die Leitlinien zum Beweiswert in [docs/EVIDENCE.md](docs/EVIDENCE.md).
 

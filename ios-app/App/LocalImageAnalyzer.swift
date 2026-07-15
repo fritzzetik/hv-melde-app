@@ -7,10 +7,25 @@ struct LocalImageAnalysis: Identifiable, Sendable {
     let id = UUID()
     let category: ReportCategory
     let vehicle: VehicleDetection
+    let vehicleType: VehicleTypeSuggestion?
+    let vehicleColor: VehicleColorSuggestion?
+    let relevantObjects: [SceneObjectSuggestion]
     let plateCandidates: [LicensePlateCandidate]
     let classifications: [ImageClassificationLabel]
     let recognizedTexts: [OCRTextCandidate]
     let imageSHA256: String
+
+    var suggestedVehicleDescription: String {
+        guard vehicle.detected else { return "" }
+        var details = ["Pkw"]
+        if let vehicleType, vehicleType.name != "Pkw" {
+            details.append("Typ: \(vehicleType.name)")
+        }
+        if let vehicleColor {
+            details.append("Farbe: \(vehicleColor.name)")
+        }
+        return details.joined(separator: ", ")
+    }
 
     var sceneSummary: String {
         var sentences: [String] = []
@@ -21,10 +36,22 @@ struct LocalImageAnalysis: Identifiable, Sendable {
             sentences.append("Auf dem Foto wurde kein Fahrzeug mit ausreichender Sicherheit erkannt.")
         }
 
+        if let vehicleType {
+            sentences.append("Als möglicher Fahrzeugtyp wurde \(vehicleType.name) erkannt.")
+        }
+        if let vehicleColor {
+            sentences.append("Die Fahrzeugfarbe wird heuristisch als \(vehicleColor.name) geschätzt.")
+        }
+
         if let plate = plateCandidates.first {
             sentences.append("Als mögliches Kennzeichen wurde \(plate.text) gelesen.")
         } else if category.expectsVehicle {
             sentences.append("Es wurde kein ausreichend plausibles Kennzeichen gelesen.")
+        }
+
+        if !relevantObjects.isEmpty {
+            let names = relevantObjects.map(\.name).joined(separator: ", ")
+            sentences.append("Als mögliche weitere Objekte wurden erkannt: \(names).")
         }
 
         sentences.append("Gewählte Meldekategorie: \(category.rawValue).")
@@ -36,15 +63,25 @@ enum LocalImageAnalyzer {
     static func analyze(imageData: Data, category: ReportCategory) async throws -> LocalImageAnalysis {
         async let classifications = classify(imageData: imageData)
         async let recognizedTexts = recognizeText(imageData: imageData)
+        async let vehicleColor = VehicleColorAnalyzer.analyze(imageData: imageData)
 
-        let (classificationResults, textResults) = try await (classifications, recognizedTexts)
+        let (classificationResults, textResults, colorResult) = try await (
+            classifications,
+            recognizedTexts,
+            vehicleColor
+        )
         let vehicle = VehicleAnalysisInterpreter.detectVehicle(in: classificationResults)
+        let vehicleType = SceneDetailInterpreter.vehicleType(in: classificationResults)
+        let relevantObjects = SceneDetailInterpreter.relevantObjects(in: classificationResults)
         let plates = LicensePlateParser.candidates(from: textResults)
         let digest = SHA256.hash(data: imageData).map { String(format: "%02x", $0) }.joined()
 
         return LocalImageAnalysis(
             category: category,
             vehicle: vehicle,
+            vehicleType: vehicleType,
+            vehicleColor: vehicle.detected ? colorResult : nil,
+            relevantObjects: relevantObjects,
             plateCandidates: plates,
             classifications: classificationResults,
             recognizedTexts: textResults,
@@ -59,7 +96,7 @@ enum LocalImageAnalyzer {
             try handler.perform([request])
 
             return (request.results ?? [])
-                .prefix(20)
+                .prefix(120)
                 .map { ImageClassificationLabel(identifier: $0.identifier, confidence: $0.confidence) }
         }.value
     }

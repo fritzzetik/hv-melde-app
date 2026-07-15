@@ -135,3 +135,101 @@ public enum VehicleAnalysisInterpreter {
         return VehicleDetection(detected: confidence >= 0.15, confidence: confidence)
     }
 }
+
+public struct VehicleTypeSuggestion: Equatable, Sendable {
+    public let name: String
+    public let confidence: Float
+    public let sourceLabel: String
+
+    public init(name: String, confidence: Float, sourceLabel: String) {
+        self.name = name
+        self.confidence = confidence
+        self.sourceLabel = sourceLabel
+    }
+}
+
+public struct SceneObjectSuggestion: Equatable, Identifiable, Sendable {
+    public let name: String
+    public let confidence: Float
+    public let sourceLabel: String
+
+    public var id: String { name }
+
+    public init(name: String, confidence: Float, sourceLabel: String) {
+        self.name = name
+        self.confidence = confidence
+        self.sourceLabel = sourceLabel
+    }
+}
+
+public enum SceneDetailInterpreter {
+    private static let vehicleTypes: [(terms: [String], name: String)] = [
+        (["station wagon", "estate car"], "Kombi"),
+        (["hatchback"], "Kompaktwagen / Schrägheck"),
+        (["sport utility", "suv", "jeep"], "SUV"),
+        (["minivan", "passenger van"], "Van"),
+        (["pickup", "pickup truck"], "Pickup"),
+        (["truck", "lorry"], "Lkw"),
+        (["convertible", "cabriolet"], "Cabriolet"),
+        (["coupe", "sports car"], "Coupé / Sportwagen"),
+        (["sedan", "saloon car"], "Limousine"),
+        (["motorcycle", "motorbike"], "Motorrad"),
+        (["car", "automobile", "motor vehicle"], "Pkw")
+    ]
+
+    private static let sceneObjects: [(terms: [String], name: String, minimumConfidence: Float)] = [
+        (["mattress"], "Matratze", 0.03),
+        (["bed frame", "bedstead"], "Bettgestell", 0.04),
+        (["sofa", "couch"], "Sofa", 0.04),
+        (["furniture"], "Möbelstück", 0.06),
+        (["garbage", "trash", "rubbish", "refuse", "junk", "bulky waste"], "Abfall / Sperrmüll", 0.05),
+        (["cardboard", "carton"], "Karton", 0.06),
+        (["tire", "tyre"], "Reifen", 0.05),
+        (["bicycle", "bike"], "Fahrrad", 0.08)
+    ]
+
+    public static func vehicleType(in labels: [ImageClassificationLabel]) -> VehicleTypeSuggestion? {
+        for mapping in vehicleTypes {
+            if let best = bestMatch(for: mapping.terms, in: labels), best.confidence >= 0.08 {
+                return VehicleTypeSuggestion(
+                    name: mapping.name,
+                    confidence: best.confidence,
+                    sourceLabel: best.identifier
+                )
+            }
+        }
+        return nil
+    }
+
+    public static func relevantObjects(in labels: [ImageClassificationLabel]) -> [SceneObjectSuggestion] {
+        sceneObjects.compactMap { mapping in
+            guard let best = bestMatch(for: mapping.terms, in: labels),
+                  best.confidence >= mapping.minimumConfidence else {
+                return nil
+            }
+            return SceneObjectSuggestion(
+                name: mapping.name,
+                confidence: best.confidence,
+                sourceLabel: best.identifier
+            )
+        }
+        .sorted { $0.confidence > $1.confidence }
+    }
+
+    private static func bestMatch(
+        for terms: [String],
+        in labels: [ImageClassificationLabel]
+    ) -> ImageClassificationLabel? {
+        labels
+            .filter { label in
+                let normalized = label.identifier.lowercased()
+                return terms.contains { term in
+                    normalized == term ||
+                    normalized.contains(", \(term)") ||
+                    normalized.contains("\(term),") ||
+                    normalized.contains(term)
+                }
+            }
+            .max { $0.confidence < $1.confidence }
+    }
+}

@@ -24,7 +24,7 @@ Eine Person dokumentiert einen konkreten Vorfall in einer Garage und erzeugt dar
 3. Pro Objekt eine Melde-E-Mail festlegen.
 4. Objekt wählen und Pflichtangaben zum Vorfall erfassen.
 5. Meldekategorie wählen und Foto importieren oder direkt aufnehmen.
-6. Foto lokal klassifizieren und mögliche Kennzeichen erkennen lassen.
+6. Foto lokal klassifizieren und mögliche Kennzeichen, Fahrzeugdetails sowie relevante Nebenobjekte erkennen lassen.
 7. KI-Vorschläge am Originalfoto prüfen und ausdrücklich bestätigen.
 8. Eingaben lokal validieren und das PDF auf dem Gerät erzeugen.
 9. Empfänger im Mailfenster vorausfüllen und das PDF anhängen.

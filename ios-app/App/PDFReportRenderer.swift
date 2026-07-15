@@ -139,7 +139,7 @@ enum PDFReportRenderer {
             margin: margin
         ) + 18
 
-        let rows: [(String, String)] = [
+        var rows: [(String, String)] = [
             ("Meldekategorie", analysis.category.rawValue),
             ("Fahrzeug erkannt", analysis.vehicleDetected ? "Ja (Konfidenz \(percentFormatter.string(from: NSNumber(value: analysis.vehicleConfidence)) ?? "–"))" : "Nein bzw. unsicher"),
             ("Bestätigtes Kennzeichen", analysis.confirmedLicensePlate),
@@ -148,6 +148,25 @@ enum PDFReportRenderer {
             ("Analyse bestätigt", dateFormatter.string(from: analysis.analyzedAt)),
             ("Analyseverfahren", analysis.analyzerDescription)
         ]
+
+        if let type = analysis.suggestedVehicleType {
+            rows.insert(
+                ("Automatisch vorgeschlagener Fahrzeugtyp", suggestionValue(type, confidence: analysis.suggestedVehicleTypeConfidence)),
+                at: 2
+            )
+        }
+        if let color = analysis.suggestedVehicleColor {
+            rows.insert(
+                ("Heuristisch geschätzte Fahrzeugfarbe", suggestionValue(color, confidence: analysis.suggestedVehicleColorConfidence)),
+                at: min(3, rows.count)
+            )
+        }
+        if !analysis.suggestedSceneObjects.isEmpty {
+            let values = analysis.suggestedSceneObjects.map {
+                suggestionValue($0.name, confidence: $0.confidence)
+            }
+            rows.insert(("Automatisch vorgeschlagene Nebenobjekte", values.joined(separator: ", ")), at: min(4, rows.count))
+        }
 
         for (label, value) in rows where !value.isEmpty {
             y = drawText(
@@ -288,6 +307,14 @@ enum PDFReportRenderer {
         formatter.maximumFractionDigits = 0
         return formatter
     }()
+
+    private static func suggestionValue(_ value: String, confidence: Float?) -> String {
+        guard let confidence,
+              let formatted = percentFormatter.string(from: NSNumber(value: confidence)) else {
+            return value
+        }
+        return "\(value) (Konfidenz \(formatted))"
+    }
 }
 
 private extension String {
