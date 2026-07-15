@@ -134,7 +134,7 @@ private struct NewReportView: View {
             .navigationTitle("Neue Meldung")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    if currentDraft.hasMeaningfulContent {
+                    if hasUnsavedDraft {
                         Button("Abbrechen", role: .destructive) {
                             showsCancelConfirmation = true
                         }
