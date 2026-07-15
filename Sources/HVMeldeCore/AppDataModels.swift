@@ -12,26 +12,53 @@ public enum SupportedCountry: String, CaseIterable, Codable, Identifiable, Senda
 
 public struct PostalAddress: Codable, Equatable, Sendable {
     public var street: String
+    public var houseNumber: String
+    public var unit: String
     public var postalCode: String
     public var city: String
     public var country: SupportedCountry
 
     public init(
         street: String = "",
+        houseNumber: String = "",
+        unit: String = "",
         postalCode: String = "",
         city: String = "",
         country: SupportedCountry = .austria
     ) {
         self.street = street
+        self.houseNumber = houseNumber
+        self.unit = unit
         self.postalCode = postalCode
         self.city = city
         self.country = country
     }
 
     public var formatted: String {
-        [street.trimmed, [postalCode.trimmed, city.trimmed].filter { !$0.isEmpty }.joined(separator: " "), country.rawValue]
+        let streetLine = [street.trimmed, houseNumber.trimmed]
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        let trimmedUnit = unit.trimmed
+        let unitLine = trimmedUnit.isEmpty
+            ? ""
+            : (trimmedUnit.lowercased().hasPrefix("top") ? trimmedUnit : "Top \(trimmedUnit)")
+        return [streetLine, unitLine, [postalCode.trimmed, city.trimmed].filter { !$0.isEmpty }.joined(separator: " "), country.rawValue]
             .filter { !$0.isEmpty }
             .joined(separator: ", ")
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case street, houseNumber, unit, postalCode, city, country
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        street = try container.decodeIfPresent(String.self, forKey: .street) ?? ""
+        houseNumber = try container.decodeIfPresent(String.self, forKey: .houseNumber) ?? ""
+        unit = try container.decodeIfPresent(String.self, forKey: .unit) ?? ""
+        postalCode = try container.decodeIfPresent(String.self, forKey: .postalCode) ?? ""
+        city = try container.decodeIfPresent(String.self, forKey: .city) ?? ""
+        country = try container.decodeIfPresent(SupportedCountry.self, forKey: .country) ?? .austria
     }
 }
 
@@ -90,6 +117,17 @@ public enum OccupancyRole: String, CaseIterable, Codable, Identifiable, Sendable
     public var id: String { rawValue }
 }
 
+public enum PropertyType: String, CaseIterable, Codable, Identifiable, Sendable {
+    case apartment = "Wohnung"
+    case garage = "Garage"
+    case commercialSpace = "Gewerbliche Fläche"
+    case basement = "Keller"
+    case storage = "Lager"
+    case other = "Sonstiges"
+
+    public var id: String { rawValue }
+}
+
 public struct ManagedProperty: Codable, Equatable, Identifiable, Sendable {
     public let id: UUID
     public var name: String
@@ -97,6 +135,8 @@ public struct ManagedProperty: Codable, Equatable, Identifiable, Sendable {
     public var propertyManagementID: UUID?
     public var reportEmail: String
     public var occupancyRole: OccupancyRole
+    public var officialName: String
+    public var propertyType: PropertyType
 
     public init(
         id: UUID = UUID(),
@@ -104,7 +144,9 @@ public struct ManagedProperty: Codable, Equatable, Identifiable, Sendable {
         address: PostalAddress = PostalAddress(),
         propertyManagementID: UUID? = nil,
         reportEmail: String = "",
-        occupancyRole: OccupancyRole = .tenant
+        occupancyRole: OccupancyRole = .tenant,
+        officialName: String = "",
+        propertyType: PropertyType = .apartment
     ) {
         self.id = id
         self.name = name
@@ -112,6 +154,8 @@ public struct ManagedProperty: Codable, Equatable, Identifiable, Sendable {
         self.propertyManagementID = propertyManagementID
         self.reportEmail = reportEmail
         self.occupancyRole = occupancyRole
+        self.officialName = officialName
+        self.propertyType = propertyType
     }
 
     public var displayName: String {
@@ -119,8 +163,13 @@ public struct ManagedProperty: Codable, Equatable, Identifiable, Sendable {
         return trimmedName.isEmpty ? address.formatted : trimmedName
     }
 
+    public var officialDisplayName: String {
+        let value = officialName.trimmed
+        return value.isEmpty ? displayName : value
+    }
+
     private enum CodingKeys: String, CodingKey {
-        case id, name, address, propertyManagementID, reportEmail, occupancyRole
+        case id, name, address, propertyManagementID, reportEmail, occupancyRole, officialName, propertyType
     }
 
     public init(from decoder: Decoder) throws {
@@ -131,6 +180,8 @@ public struct ManagedProperty: Codable, Equatable, Identifiable, Sendable {
         propertyManagementID = try container.decodeIfPresent(UUID.self, forKey: .propertyManagementID)
         reportEmail = try container.decode(String.self, forKey: .reportEmail)
         occupancyRole = try container.decodeIfPresent(OccupancyRole.self, forKey: .occupancyRole) ?? .tenant
+        officialName = try container.decodeIfPresent(String.self, forKey: .officialName) ?? ""
+        propertyType = try container.decodeIfPresent(PropertyType.self, forKey: .propertyType) ?? .apartment
     }
 }
 
@@ -162,6 +213,8 @@ public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
     public let pdfFileName: String
     public let evidenceSHA256: String?
     public let isCommonArea: Bool?
+    public let officialPropertyName: String?
+    public let propertyType: PropertyType?
 
     public init(
         id: UUID,
@@ -183,7 +236,9 @@ public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
         completedAt: Date? = nil,
         pdfFileName: String,
         evidenceSHA256: String? = nil,
-        isCommonArea: Bool = false
+        isCommonArea: Bool = false,
+        officialPropertyName: String? = nil,
+        propertyType: PropertyType? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -205,9 +260,18 @@ public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
         self.pdfFileName = pdfFileName
         self.evidenceSHA256 = evidenceSHA256
         self.isCommonArea = isCommonArea
+        self.officialPropertyName = officialPropertyName
+        self.propertyType = propertyType
     }
 
     public var concernsCommonArea: Bool { isCommonArea ?? false }
+
+    public var recipientPropertyName: String {
+        let value = officialPropertyName?.trimmed ?? ""
+        return value.isEmpty ? propertyName : value
+    }
+
+    public var resolvedPropertyType: PropertyType { propertyType ?? .apartment }
 }
 
 public struct AppDataState: Codable, Equatable, Sendable {

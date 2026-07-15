@@ -19,7 +19,7 @@ Serverlose iPhone-App zur strukturierten Dokumentation von Vorfällen in verwalt
 5. Empfänger anhand des gewählten Objekts vorausfüllen
 6. PDF per Mail versenden oder über das System-Teilen-Menü speichern
 
-Über das Zahnrad lassen sich persönliche Absenderdaten, mehrere Objekte und wiederverwendbare Hausverwaltungen lokal hinterlegen. Jedes Objekt besitzt eine eigene Melde-E-Mail-Adresse und die Zuordnung „Mieter“ oder „Eigentümer“.
+Über das Zahnrad lassen sich persönliche Absenderdaten, mehrere Objekte und wiederverwendbare Hausverwaltungen lokal hinterlegen. Jedes Objekt besitzt einen internen Namen, eine optionale offizielle Bezeichnung, einen Objekttyp, eine strukturierte Anschrift, eine eigene Melde-E-Mail-Adresse und die Zuordnung „Mieter“ oder „Eigentümer“.
 
 Erzeugte Meldungen werden mit ihrem PDF dauerhaft im geschützten App-Verzeichnis gespeichert. Über das Fallarchiv lassen sie sich als offen oder erledigt führen, wieder öffnen und erneut teilen. Pro Meldung wird festgehalten, ob sie das gemietete beziehungsweise eigene Objekt oder eine Allgemeinfläche betrifft. Eine spätere Synchronisierung über den persönlichen iCloud-Account ist vorbereitet, aber noch nicht aktiviert.
 

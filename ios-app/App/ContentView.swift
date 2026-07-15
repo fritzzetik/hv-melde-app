@@ -47,6 +47,10 @@ struct ContentView: View {
                             }
                         }
                         if let selectedProperty {
+                            LabeledContent("Objekttyp", value: selectedProperty.propertyType.rawValue)
+                            if !selectedProperty.officialName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                LabeledContent("Offizielle Bezeichnung", value: selectedProperty.officialName)
+                            }
                             LabeledContent("Nutzungsverhältnis", value: selectedProperty.occupancyRole.rawValue)
                         }
                     }
@@ -255,9 +259,22 @@ struct ContentView: View {
 
     private func prepareMail(pdfURL: URL, recipient: String) {
         let subjectPlate = licensePlate.trimmingCharacters(in: .whitespacesAndNewlines)
-        let subject = subjectPlate.isEmpty
-            ? "Meldung zu \(selectedProperty?.displayName ?? "Objekt")"
-            : "Meldung Kennzeichen \(subjectPlate)"
+        let objectName = selectedProperty?.officialDisplayName ?? "Objekt"
+        var subjectDetails = [garageLocation.trimmingCharacters(in: .whitespacesAndNewlines)]
+            .filter { !$0.isEmpty }
+        if !subjectPlate.isEmpty {
+            subjectDetails.append("Kennzeichen \(subjectPlate)")
+        }
+        if subjectDetails.isEmpty {
+            let summary = notes
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\n", with: " ")
+            if !summary.isEmpty {
+                subjectDetails.append(String(summary.prefix(60)))
+            }
+        }
+        let details = subjectDetails.isEmpty ? "Details siehe PDF" : subjectDetails.joined(separator: ", ")
+        let subject = "\(objectName) - \(violation) - \(details)"
         mailDraft = MailDraft(
             recipients: [recipient],
             subject: subject,

@@ -99,7 +99,9 @@ final class AppDataStore: ObservableObject {
                 completedAt: existing?.completedAt,
                 pdfFileName: pdfFileName,
                 evidenceSHA256: evidenceSHA256,
-                isCommonArea: report.isCommonArea
+                isCommonArea: report.isCommonArea,
+                officialPropertyName: property.officialName,
+                propertyType: property.propertyType
             )
             if let index = state.reportedCases.firstIndex(where: { $0.id == report.id }) {
                 state.reportedCases[index] = storedCase

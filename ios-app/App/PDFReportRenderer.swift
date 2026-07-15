@@ -295,7 +295,7 @@ enum PDFReportRenderer {
         y = max(198, y + 52)
 
         y = drawText(
-            "Meldung: \(report.violation) - \(property.displayName)",
+            reportSubject(report, property: property),
             at: y,
             width: contentWidth,
             font: .boldSystemFont(ofSize: 15),
@@ -330,7 +330,8 @@ enum PDFReportRenderer {
         ) + 16
 
         var factLines = [
-            "Objekt: \(property.displayName)",
+            "Objekt: \(property.officialDisplayName)",
+            "Objekttyp: \(property.propertyType.rawValue)",
             "Objektanschrift: \(property.address.formatted)",
             "Beobachtet: \(dateFormatter.string(from: report.incidentAt))",
             "Bereich: \(report.garageLocation)",
@@ -440,7 +441,9 @@ enum PDFReportRenderer {
             ("Absender", profile.fullName),
             ("Anschrift Absender", profile.address.formatted),
             ("Kontakt Absender", [profile.phone, profile.email].filter { !$0.isEmpty }.joined(separator: " · ")),
-            ("Objekt", property.displayName),
+            ("Offizielle Objektbezeichnung", property.officialDisplayName),
+            ("Interner Objektname", property.officialDisplayName == property.displayName ? "" : property.displayName),
+            ("Objekttyp", property.propertyType.rawValue),
             ("Objektanschrift", property.address.formatted),
             ("Nutzungsverhältnis", property.occupancyRole.rawValue),
             ("Bezug der Meldung", reportScope(for: report, property: property)),
@@ -570,10 +573,17 @@ enum PDFReportRenderer {
     }
 
     private static func postalAddressLines(_ address: PostalAddress) -> String {
+        let streetLine = [address.street, address.houseNumber]
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: " ")
         let cityLine = [address.postalCode, address.city]
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .joined(separator: " ")
-        return [address.street, cityLine, address.country.rawValue]
+        let trimmedUnit = address.unit.trimmingCharacters(in: .whitespacesAndNewlines)
+        let unitLine = trimmedUnit.isEmpty
+            ? ""
+            : (trimmedUnit.lowercased().hasPrefix("top") ? trimmedUnit : "Top \(trimmedUnit)")
+        return [streetLine, unitLine, cityLine, address.country.rawValue]
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .joined(separator: "\n")
     }
@@ -608,6 +618,25 @@ enum PDFReportRenderer {
     private static func reportScope(for report: IncidentReport, property: ManagedProperty) -> String {
         if report.isCommonArea { return "Allgemeinfläche" }
         return property.occupancyRole == .tenant ? "Gemietetes Objekt" : "Objekt im Eigentum"
+    }
+
+    private static func reportSubject(_ report: IncidentReport, property: ManagedProperty) -> String {
+        var details = [report.garageLocation.trimmingCharacters(in: .whitespacesAndNewlines)]
+            .filter { !$0.isEmpty }
+        let plate = report.licensePlate.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !plate.isEmpty {
+            details.append("Kennzeichen \(plate)")
+        }
+        if details.isEmpty {
+            let summary = report.notes
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\n", with: " ")
+            if !summary.isEmpty {
+                details.append(String(summary.prefix(70)))
+            }
+        }
+        let detailText = details.isEmpty ? "Details siehe Anlage 1" : details.joined(separator: ", ")
+        return "\(property.officialDisplayName) - \(report.violation) - \(detailText)"
     }
 
     private static let percentFormatter: NumberFormatter = {

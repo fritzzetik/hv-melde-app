@@ -24,6 +24,20 @@ func propertyDisplayNameFallsBackToAddress() {
     #expect(property.displayName == "Musterstraße 1, 1010 Wien, Österreich")
 }
 
+@Test("Strukturierte Anschrift enthält Hausnummer und Top")
+func structuredAddressIsFormatted() {
+    let address = PostalAddress(
+        street: "J.W.-Goethestraße",
+        houseNumber: "114",
+        unit: "14",
+        postalCode: "39012",
+        city: "Meran",
+        country: .italy
+    )
+
+    #expect(address.formatted == "J.W.-Goethestraße 114, Top 14, 39012 Meran, Italien")
+}
+
 @Test("Eine Hausverwaltung kann mehreren Objekten zugeordnet sein")
 func managementCanBeSharedByProperties() {
     let management = PropertyManagement(name: "Beispiel Hausverwaltung")
@@ -41,9 +55,12 @@ func appDataRoundTrip() throws {
         properties: [
             ManagedProperty(
                 name: "Wohnung Wien",
+                address: PostalAddress(street: "Musterstraße", houseNumber: "1", unit: "7"),
                 propertyManagementID: management.id,
                 reportEmail: "meldung@example.com",
-                occupancyRole: .owner
+                occupancyRole: .owner,
+                officialName: "Wohnanlage Musterhof",
+                propertyType: .apartment
             )
         ],
         propertyManagements: [management],
@@ -64,7 +81,9 @@ func appDataRoundTrip() throws {
                 notes: "",
                 witnesses: "",
                 pdfFileName: "Meldung.pdf",
-                isCommonArea: true
+                isCommonArea: true,
+                officialPropertyName: "Wohnanlage Musterhof",
+                propertyType: .apartment
             )
         ]
     )
@@ -101,6 +120,8 @@ func oldCaseWithoutAreaScopeDefaultsToOwnObject() throws {
     let decoded = try JSONDecoder().decode(StoredReportedCase.self, from: legacyData)
 
     #expect(!decoded.concernsCommonArea)
+    #expect(decoded.recipientPropertyName == "Bestandsobjekt")
+    #expect(decoded.resolvedPropertyType == .apartment)
 }
 
 @Test("Bestehende lokale Daten ohne Rolle und Fallliste bleiben lesbar")
@@ -113,11 +134,22 @@ func oldAppDataMigratesWithDefaults() throws {
     json.removeValue(forKey: "reportedCases")
     var properties = try #require(json["properties"] as? [[String: Any]])
     properties[0].removeValue(forKey: "occupancyRole")
+    properties[0].removeValue(forKey: "officialName")
+    properties[0].removeValue(forKey: "propertyType")
+    if var address = properties[0]["address"] as? [String: Any] {
+        address.removeValue(forKey: "houseNumber")
+        address.removeValue(forKey: "unit")
+        properties[0]["address"] = address
+    }
     json["properties"] = properties
 
     let legacyData = try JSONSerialization.data(withJSONObject: json)
     let decoded = try JSONDecoder().decode(AppDataState.self, from: legacyData)
 
     #expect(decoded.properties.first?.occupancyRole == .tenant)
+    #expect(decoded.properties.first?.officialName == "")
+    #expect(decoded.properties.first?.propertyType == .apartment)
+    #expect(decoded.properties.first?.address.houseNumber == "")
+    #expect(decoded.properties.first?.address.unit == "")
     #expect(decoded.reportedCases.isEmpty)
 }

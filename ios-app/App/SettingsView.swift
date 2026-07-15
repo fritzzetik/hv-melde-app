@@ -21,7 +21,11 @@ struct SettingsView: View {
                     } label: {
                         VStack(alignment: .leading) {
                             Text(property.displayName)
-                            Text(property.occupancyRole.rawValue)
+                            if !property.officialName.trimmedIsEmpty {
+                                Text(property.officialName)
+                                    .font(.subheadline)
+                            }
+                            Text("\(property.propertyType.rawValue) · \(property.occupancyRole.rawValue)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             if !property.address.formatted.isEmpty {
@@ -143,7 +147,13 @@ private struct PropertyEditorView: View {
     var body: some View {
         Form {
             Section("Objekt") {
-                TextField("Bezeichnung, z. B. Wohnung Wien", text: $property.name)
+                TextField("Interner Name, z. B. Wohnung Meran", text: $property.name)
+                TextField("Offizieller Objektname (optional)", text: $property.officialName)
+                Picker("Objekttyp", selection: $property.propertyType) {
+                    ForEach(PropertyType.allCases) { type in
+                        Text(type.rawValue).tag(type)
+                    }
+                }
                 Picker("Nutzungsverhältnis", selection: $property.occupancyRole) {
                     ForEach(OccupancyRole.allCases) { role in
                         Text(role.rawValue).tag(role)
@@ -236,8 +246,10 @@ private struct AddressFields: View {
 
     var body: some View {
         Section("Anschrift") {
-            TextField("Straße und Hausnummer", text: $address.street)
+            TextField("Straße", text: $address.street)
                 .textContentType(.streetAddressLine1)
+            TextField("Hausnummer", text: $address.houseNumber)
+            TextField("Top / Einheit (optional)", text: $address.unit)
             TextField("PLZ", text: $address.postalCode)
                 .textContentType(.postalCode)
             TextField("Ort", text: $address.city)

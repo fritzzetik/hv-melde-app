@@ -7,6 +7,9 @@ Eine Person dokumentiert einen konkreten Vorfall in einer Garage und erzeugt dar
 ## Angaben pro Meldung
 
 - Objekt oder Liegenschaft
+- interner Objektname und optionale offizielle Bezeichnung für die Hausverwaltung
+- Objekttyp: Wohnung, Garage, gewerbliche Fläche, Keller, Lager oder Sonstiges
+- strukturierte Anschrift aus Straße, Hausnummer und optionalem Top
 - genauer Bereich, Stellplatz oder Garagenebene
 - Bezug zum gemieteten/eigenen Objekt oder zu einer Allgemeinfläche
 - Datum und Uhrzeit des beobachteten Vorfalls

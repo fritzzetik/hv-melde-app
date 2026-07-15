@@ -82,6 +82,11 @@ private struct ReportedCaseRow: View {
                 Text(reportedCase.category.rawValue)
                     .font(.headline)
                 Text(reportedCase.propertyName)
+                if reportedCase.recipientPropertyName != reportedCase.propertyName {
+                    Text(reportedCase.recipientPropertyName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Text(reportedCase.concernsCommonArea ? "Allgemeinfläche" : reportedCase.occupancyRole.rawValue)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -133,7 +138,11 @@ private struct ReportedCaseDetailView: View {
                     }
 
                     Section("Objekt") {
-                        LabeledContent("Objekt", value: reportedCase.propertyName)
+                        LabeledContent("Interner Name", value: reportedCase.propertyName)
+                        if reportedCase.recipientPropertyName != reportedCase.propertyName {
+                            LabeledContent("Offizielle Bezeichnung", value: reportedCase.recipientPropertyName)
+                        }
+                        LabeledContent("Objekttyp", value: reportedCase.resolvedPropertyType.rawValue)
                         LabeledContent("Rolle", value: reportedCase.occupancyRole.rawValue)
                         LabeledContent(
                             "Bezug der Meldung",
