@@ -1,9 +1,11 @@
 import HVMeldeCore
+import MessageUI
 import SwiftUI
 
 struct ContentView: View {
+    @EnvironmentObject private var store: AppDataStore
+    @State private var selectedPropertyID: UUID?
     @State private var incidentAt = Date()
-    @State private var propertyName = ""
     @State private var garageLocation = ""
     @State private var licensePlate = ""
     @State private var vehicleDescription = ""
@@ -11,13 +13,28 @@ struct ContentView: View {
     @State private var notes = ""
     @State private var witnesses = ""
     @State private var generatedPDF: URL?
+    @State private var mailDraft: MailDraft?
     @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Ort und Zeitpunkt") {
-                    TextField("Objekt oder Liegenschaft", text: $propertyName)
+                    if store.state.properties.isEmpty {
+                        ContentUnavailableView(
+                            "Noch kein Objekt",
+                            systemImage: "building.2",
+                            description: Text("Lege zuerst über das Zahnrad ein Objekt an.")
+                        )
+                    } else {
+                        Picker("Objekt", selection: $selectedPropertyID) {
+                            Text("Bitte wählen").tag(UUID?.none)
+                            ForEach(store.state.properties) { property in
+                                Text(property.displayName).tag(Optional(property.id))
+                            }
+                        }
+                    }
+
                     TextField("Garagenbereich oder Stellplatz", text: $garageLocation)
                     DatePicker("Beobachtet am", selection: $incidentAt)
                 }
@@ -34,23 +51,60 @@ struct ContentView: View {
 
                 Section {
                     Button("PDF erzeugen", action: generatePDF)
+                        .disabled(selectedProperty == nil)
 
                     if let generatedPDF {
+                        if let recipient = selectedProperty?.reportEmail.nonEmpty {
+                            Button {
+                                prepareMail(pdfURL: generatedPDF, recipient: recipient)
+                            } label: {
+                                Label("PDF per E-Mail senden", systemImage: "envelope")
+                            }
+                            .disabled(!MFMailComposeViewController.canSendMail())
+                        }
+
                         ShareLink(item: generatedPDF) {
-                            Label("PDF teilen", systemImage: "square.and.arrow.up")
+                            Label("PDF anderweitig teilen", systemImage: "square.and.arrow.up")
                         }
                     }
                 } footer: {
-                    Text("Die App überträgt keine Daten automatisch. Erst das Teilen gibt das PDF an eine andere App weiter.")
+                    if selectedProperty?.reportEmail.nonEmpty == nil {
+                        Text("Hinterlege beim Objekt eine Melde-E-Mail, um den Empfänger automatisch auszufüllen.")
+                    } else if !MFMailComposeViewController.canSendMail() {
+                        Text("Auf diesem Gerät ist kein Mailkonto für die Apple-Mail-App eingerichtet. Das PDF kann weiterhin geteilt werden.")
+                    } else {
+                        Text("Die App überträgt keine Daten automatisch. Der Versand erfolgt erst nach deiner Bestätigung im Mailfenster.")
+                    }
                 }
             }
             .navigationTitle("Neue Meldung")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        SettingsView()
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .accessibilityLabel("Einstellungen")
+                }
+            }
+            .onAppear(perform: selectFirstPropertyIfNeeded)
+            .onChange(of: store.state.properties) { _, _ in selectFirstPropertyIfNeeded() }
+            .onChange(of: selectedPropertyID) { _, _ in generatedPDF = nil }
+            .sheet(item: $mailDraft) { draft in
+                MailComposerView(draft: draft)
+            }
             .alert("PDF konnte nicht erzeugt werden", isPresented: errorIsPresented) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(errorMessage ?? "Unbekannter Fehler")
             }
         }
+    }
+
+    private var selectedProperty: ManagedProperty? {
+        guard let selectedPropertyID else { return nil }
+        return store.state.properties.first { $0.id == selectedPropertyID }
     }
 
     private var errorIsPresented: Binding<Bool> {
@@ -60,10 +114,23 @@ struct ContentView: View {
         )
     }
 
+    private func selectFirstPropertyIfNeeded() {
+        if let selectedPropertyID,
+           store.state.properties.contains(where: { $0.id == selectedPropertyID }) {
+            return
+        }
+        selectedPropertyID = store.state.properties.first?.id
+    }
+
     private func generatePDF() {
+        guard let property = selectedProperty else {
+            errorMessage = "Bitte lege ein Objekt an und wähle es aus."
+            return
+        }
+
         let report = IncidentReport(
             incidentAt: incidentAt,
-            propertyName: propertyName,
+            propertyName: property.displayName,
             garageLocation: garageLocation,
             licensePlate: licensePlate,
             vehicleDescription: vehicleDescription,
@@ -74,7 +141,12 @@ struct ContentView: View {
 
         do {
             try IncidentReportValidator.validate(report)
-            generatedPDF = try PDFReportRenderer.render(report)
+            generatedPDF = try PDFReportRenderer.render(
+                report,
+                profile: store.state.profile,
+                property: property,
+                management: store.management(for: property)
+            )
             errorMessage = nil
         } catch let validationError as IncidentReportValidationError {
             let labels = validationError.missingFields.map(fieldLabel).joined(separator: ", ")
@@ -82,6 +154,19 @@ struct ContentView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func prepareMail(pdfURL: URL, recipient: String) {
+        let subjectPlate = licensePlate.trimmingCharacters(in: .whitespacesAndNewlines)
+        let subject = subjectPlate.isEmpty
+            ? "Meldung zu \(selectedProperty?.displayName ?? "Objekt")"
+            : "Meldung Kennzeichen \(subjectPlate)"
+        mailDraft = MailDraft(
+            recipients: [recipient],
+            subject: subject,
+            body: "Guten Tag,\n\nim Anhang übermittle ich die Dokumentation des Vorfalls.\n\nMit freundlichen Grüßen\n\(store.state.profile.fullName)",
+            attachmentURL: pdfURL
+        )
     }
 
     private func fieldLabel(_ field: IncidentReportField) -> String {
@@ -96,5 +181,13 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environmentObject(AppDataStore())
+}
+
+private extension String {
+    var nonEmpty: String? {
+        let value = trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
 }
 

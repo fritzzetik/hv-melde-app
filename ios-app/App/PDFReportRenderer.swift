@@ -3,12 +3,17 @@ import UIKit
 
 @MainActor
 enum PDFReportRenderer {
-    static func render(_ report: IncidentReport) throws -> URL {
+    static func render(
+        _ report: IncidentReport,
+        profile: UserProfile,
+        property: ManagedProperty,
+        management: PropertyManagement?
+    ) throws -> URL {
         let pageBounds = CGRect(x: 0, y: 0, width: 595, height: 842)
         let renderer = UIGraphicsPDFRenderer(bounds: pageBounds)
         let data = renderer.pdfData { context in
             context.beginPage()
-            draw(report, in: pageBounds)
+            draw(report, profile: profile, property: property, management: management, in: pageBounds)
         }
 
         let url = FileManager.default.temporaryDirectory
@@ -17,7 +22,13 @@ enum PDFReportRenderer {
         return url
     }
 
-    private static func draw(_ report: IncidentReport, in bounds: CGRect) {
+    private static func draw(
+        _ report: IncidentReport,
+        profile: UserProfile,
+        property: ManagedProperty,
+        management: PropertyManagement?,
+        in bounds: CGRect
+    ) {
         let margin: CGFloat = 48
         let contentWidth = bounds.width - (2 * margin)
         var y = margin
@@ -35,7 +46,13 @@ enum PDFReportRenderer {
             ("Meldungs-ID", report.id.uuidString),
             ("Erstellt", dateFormatter.string(from: report.createdAt)),
             ("Beobachtet", dateFormatter.string(from: report.incidentAt)),
-            ("Objekt", report.propertyName),
+            ("Absender", profile.fullName),
+            ("Anschrift Absender", profile.address.formatted),
+            ("Kontakt Absender", [profile.phone, profile.email].filter { !$0.isEmpty }.joined(separator: " · ")),
+            ("Objekt", property.displayName),
+            ("Objektanschrift", property.address.formatted),
+            ("Hausverwaltung", management?.name ?? ""),
+            ("Melde-E-Mail", property.reportEmail),
             ("Garagenbereich", report.garageLocation),
             ("Kennzeichen", report.licensePlate),
             ("Fahrzeug", report.vehicleDescription),

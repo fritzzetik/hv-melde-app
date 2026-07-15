@@ -18,11 +18,13 @@ Eine Person dokumentiert einen konkreten Vorfall in einer Garage und erzeugt dar
 
 ## MVP-Ablauf
 
-1. Pflichtangaben erfassen.
-2. Eingaben lokal validieren.
-3. Zusammenfassung anzeigen.
-4. PDF auf dem Gerät erzeugen.
-5. PDF über das System-Teilen-Menü weitergeben.
+1. Persönliche Absenderdaten einmalig lokal hinterlegen.
+2. Hausverwaltungen und mehrere verwaltete Objekte anlegen.
+3. Pro Objekt eine Melde-E-Mail festlegen.
+4. Objekt wählen und Pflichtangaben zum Vorfall erfassen.
+5. Eingaben lokal validieren und das PDF auf dem Gerät erzeugen.
+6. Empfänger im Mailfenster vorausfüllen und das PDF anhängen.
+7. Versand ausdrücklich bestätigen oder das PDF anderweitig teilen.
 
 ## Datenschutzgrenze
 
@@ -31,6 +33,7 @@ Eine Person dokumentiert einen konkreten Vorfall in einer Garage und erzeugt dar
 - keine Telemetrie
 - keine automatische Übertragung
 - temporäre PDF-Dateien werden nur im App-eigenen Verzeichnis erzeugt
+- Profil-, Objekt- und Verwaltungsdaten werden ausschließlich im App-Verzeichnis gespeichert
 
 ## Abnahmekriterien der ersten Iteration
 
@@ -47,4 +50,3 @@ Eine Person dokumentiert einen konkreten Vorfall in einer Garage und erzeugt dar
 - lokale, verschlüsselte Entwürfe
 - Vorlagen für verschiedene Hausverwaltungen
 - optional qualifizierte Signatur oder vertrauenswürdiger Zeitstempel nach rechtlicher Prüfung
-

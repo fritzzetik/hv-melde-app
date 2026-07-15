@@ -16,7 +16,10 @@ Serverlose iPhone-App zur strukturierten Dokumentation von Vorfällen in verwalt
 2. Vorfall mit Datum, Uhrzeit, Kennzeichen und Beschreibung erfassen
 3. Angaben prüfen
 4. PDF lokal erzeugen
-5. PDF über das System-Teilen-Menü versenden oder speichern
+5. Empfänger anhand des gewählten Objekts vorausfüllen
+6. PDF per Mail versenden oder über das System-Teilen-Menü speichern
+
+Über das Zahnrad lassen sich persönliche Absenderdaten, mehrere Objekte und wiederverwendbare Hausverwaltungen lokal hinterlegen. Jedes Objekt besitzt eine eigene Melde-E-Mail-Adresse.
 
 Fotos, Prüfsummen und eine nachvollziehbare Änderungshistorie folgen in einem eigenen Umsetzungsschritt. Der fachliche Umfang steht in [docs/MVP.md](docs/MVP.md), die Leitlinien zum Beweiswert in [docs/EVIDENCE.md](docs/EVIDENCE.md).
 
@@ -34,6 +37,7 @@ Fotos, Prüfsummen und eine nachvollziehbare Änderungshistorie folgen in einem 
 
 - `HVMeldeCore`: Datenmodell und Validierung ohne UI-Abhängigkeiten
 - `ios-app/App`: SwiftUI-Oberfläche und PDF-Ausgabe mit iOS-Frameworks
+- lokale Stammdaten als JSON im geschützten App-Verzeichnis
 - XcodeGen erzeugt das Xcode-Projekt aus `project.yml`; das generierte Projekt wird nicht eingecheckt
 - `.github/workflows/testflight.yml`: manueller, signierter Upload zu TestFlight
 
@@ -52,7 +56,7 @@ Die Entwicklung kann unter Windows erfolgen. GitHub Actions übernimmt Pakettest
 ## Noch nicht enthalten
 
 - Fotoaufnahme und Import aus der Mediathek
-- lokale Entwurfsablage
+- lokale Ablage unfertiger Meldungen
 - kryptografische Prüfsummen
 - TestFlight- und App-Store-Veröffentlichung
 - rechtliche Prüfung des Dokumentationsprozesses
