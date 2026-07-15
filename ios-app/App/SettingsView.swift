@@ -11,7 +11,9 @@ struct SettingsView: View {
                     "Erweiterte lokale Analyse",
                     isOn: Binding(
                         get: { store.state.preferences.enhancedLocalAnalysisEnabled },
-                        set: store.setEnhancedLocalAnalysisEnabled
+                        set: { isEnabled in
+                            store.setEnhancedLocalAnalysisEnabled(isEnabled)
+                        }
                     )
                 )
                 LabeledContent("Apple Intelligence", value: LocalIntelligenceService.availability.settingsDescription)
