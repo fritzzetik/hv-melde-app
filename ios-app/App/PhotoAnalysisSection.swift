@@ -97,6 +97,7 @@ struct PhotoAnalysisSection: View {
                             }
                         }
                         .disabled(isAnalyzing)
+                        .buttonStyle(.bordered)
 
                         Spacer()
 
@@ -106,6 +107,7 @@ struct PhotoAnalysisSection: View {
                             Label("Entfernen", systemImage: "trash")
                         }
                         .disabled(isAnalyzing || isImporting)
+                        .buttonStyle(.borderless)
                     }
 
                     if let result = analysisResults[photo.id] {
