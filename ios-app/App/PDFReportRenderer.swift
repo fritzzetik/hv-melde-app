@@ -226,6 +226,7 @@ enum PDFReportRenderer {
             ("Kontakt Absender", [profile.phone, profile.email].filter { !$0.isEmpty }.joined(separator: " · ")),
             ("Objekt", property.displayName),
             ("Objektanschrift", property.address.formatted),
+            ("Nutzungsverhältnis", property.occupancyRole.rawValue),
             ("Hausverwaltung", management?.name ?? ""),
             ("Melde-E-Mail", property.reportEmail),
             ("Garagenbereich", report.garageLocation),

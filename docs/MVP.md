@@ -27,8 +27,10 @@ Eine Person dokumentiert einen konkreten Vorfall in einer Garage und erzeugt dar
 6. Foto lokal klassifizieren und mögliche Kennzeichen, Fahrzeugdetails sowie relevante Nebenobjekte erkennen lassen.
 7. KI-Vorschläge am Originalfoto prüfen und ausdrücklich bestätigen.
 8. Eingaben lokal validieren und das PDF auf dem Gerät erzeugen.
-9. Empfänger im Mailfenster vorausfüllen und das PDF anhängen.
-10. Versand ausdrücklich bestätigen oder das PDF anderweitig teilen.
+9. Fall und PDF dauerhaft lokal speichern.
+10. Empfänger im Mailfenster vorausfüllen und das PDF anhängen.
+11. Versand ausdrücklich bestätigen oder das PDF anderweitig teilen.
+12. Fall später als erledigt markieren oder wieder öffnen.
 
 ## Datenschutzgrenze
 
@@ -39,6 +41,7 @@ Eine Person dokumentiert einen konkreten Vorfall in einer Garage und erzeugt dar
 - temporäre PDF-Dateien werden nur im App-eigenen Verzeichnis erzeugt
 - Profil-, Objekt- und Verwaltungsdaten werden ausschließlich im App-Verzeichnis gespeichert
 - Beweisfoto und zugehörige Metadaten werden geschützt im App-Verzeichnis gespeichert
+- Fallarchiv und dauerhafte PDF-Dateien werden ausschließlich im App-Verzeichnis gespeichert
 
 ## Abnahmekriterien der ersten Iteration
 
@@ -50,6 +53,7 @@ Eine Person dokumentiert einen konkreten Vorfall in einer Garage und erzeugt dar
 - Foto, vollständige SHA-256-Prüfsumme und verfügbare EXIF-Aufnahmezeit erscheinen im PDF.
 - Fehlende EXIF-Aufnahmezeit oder Zeitzone wird sichtbar als solche gekennzeichnet.
 - Das PDF lässt sich über das System-Teilen-Menü weitergeben.
+- Gespeicherte Fälle lassen sich als offen oder erledigt verwalten.
 - Die Kernvalidierung wird automatisiert getestet.
 
 ## Spätere Iterationen

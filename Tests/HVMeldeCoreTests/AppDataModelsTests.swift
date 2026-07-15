@@ -42,13 +42,52 @@ func appDataRoundTrip() throws {
             ManagedProperty(
                 name: "Wohnung Wien",
                 propertyManagementID: management.id,
-                reportEmail: "meldung@example.com"
+                reportEmail: "meldung@example.com",
+                occupancyRole: .owner
             )
         ],
-        propertyManagements: [management]
+        propertyManagements: [management],
+        reportedCases: [
+            StoredReportedCase(
+                id: UUID(),
+                createdAt: Date(timeIntervalSince1970: 100),
+                incidentAt: Date(timeIntervalSince1970: 50),
+                propertyID: UUID(),
+                propertyName: "Wohnung Wien",
+                propertyAddress: PostalAddress(),
+                occupancyRole: .owner,
+                category: .unauthorizedVehicle,
+                garageLocation: "Stellplatz 7",
+                licensePlate: "EM 462LG",
+                vehicleDescription: "Pkw, Schwarz",
+                violation: "Dauerparken",
+                notes: "",
+                witnesses: "",
+                pdfFileName: "Meldung.pdf"
+            )
+        ]
     )
 
     let decoded = try JSONDecoder().decode(AppDataState.self, from: JSONEncoder().encode(original))
 
     #expect(decoded == original)
+}
+
+@Test("Bestehende lokale Daten ohne Rolle und Fallliste bleiben lesbar")
+func oldAppDataMigratesWithDefaults() throws {
+    let oldState = AppDataState(
+        properties: [ManagedProperty(name: "Bestandsobjekt", reportEmail: "hv@example.com")]
+    )
+    let encoded = try JSONEncoder().encode(oldState)
+    var json = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    json.removeValue(forKey: "reportedCases")
+    var properties = try #require(json["properties"] as? [[String: Any]])
+    properties[0].removeValue(forKey: "occupancyRole")
+    json["properties"] = properties
+
+    let legacyData = try JSONSerialization.data(withJSONObject: json)
+    let decoded = try JSONDecoder().decode(AppDataState.self, from: legacyData)
+
+    #expect(decoded.properties.first?.occupancyRole == .tenant)
+    #expect(decoded.reportedCases.isEmpty)
 }

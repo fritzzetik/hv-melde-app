@@ -45,6 +45,9 @@ struct ContentView: View {
                                 Text(property.displayName).tag(Optional(property.id))
                             }
                         }
+                        if let selectedProperty {
+                            LabeledContent("Nutzungsverhältnis", value: selectedProperty.occupancyRole.rawValue)
+                        }
                     }
 
                     TextField("Garagenbereich oder Stellplatz", text: $garageLocation)
@@ -69,12 +72,16 @@ struct ContentView: View {
                     vehicleDescription: $vehicleDescription,
                     notes: $notes
                 )
+                .id(reportID)
 
                 Section {
                     Button("PDF erzeugen", action: generatePDF)
                         .disabled(selectedProperty == nil)
 
                     if let generatedPDF {
+                        Label("Fall wurde lokal gespeichert", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+
                         if let recipient = selectedProperty?.reportEmail.nonEmpty {
                             Button {
                                 prepareMail(pdfURL: generatedPDF, recipient: recipient)
@@ -87,6 +94,8 @@ struct ContentView: View {
                         ShareLink(item: generatedPDF) {
                             Label("PDF anderweitig teilen", systemImage: "square.and.arrow.up")
                         }
+
+                        Button("Neue Meldung beginnen", action: resetReport)
                     }
                 } footer: {
                     if selectedProperty?.reportEmail.nonEmpty == nil {
@@ -100,6 +109,14 @@ struct ContentView: View {
             }
             .navigationTitle("Neue Meldung")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    NavigationLink {
+                        ReportedCasesView()
+                    } label: {
+                        Image(systemName: "tray.full")
+                    }
+                    .accessibilityLabel("Gemeldete Fälle")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {
                         SettingsView()
@@ -119,10 +136,10 @@ struct ContentView: View {
             .sheet(item: $mailDraft) { draft in
                 MailComposerView(draft: draft)
             }
-            .alert("PDF konnte nicht erzeugt werden", isPresented: errorIsPresented) {
+            .alert("Meldung konnte nicht gespeichert werden", isPresented: errorIsPresented) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text(errorMessage ?? "Unbekannter Fehler")
+                Text(errorMessage ?? store.lastError ?? "Unbekannter Fehler")
             }
         }
     }
@@ -134,8 +151,13 @@ struct ContentView: View {
 
     private var errorIsPresented: Binding<Bool> {
         Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
+            get: { errorMessage != nil || store.lastError != nil },
+            set: {
+                if !$0 {
+                    errorMessage = nil
+                    store.clearError()
+                }
+            }
         )
     }
 
@@ -168,20 +190,44 @@ struct ContentView: View {
 
         do {
             try IncidentReportValidator.validate(report)
-            generatedPDF = try PDFReportRenderer.render(
+            let temporaryPDF = try PDFReportRenderer.render(
                 report,
                 profile: store.state.profile,
                 property: property,
                 management: store.management(for: property),
                 evidencePhoto: evidencePhoto
             )
+            generatedPDF = try store.saveReportedCase(
+                report: report,
+                category: category,
+                property: property,
+                generatedPDFURL: temporaryPDF,
+                evidenceSHA256: evidencePhoto?.sha256
+            )
             errorMessage = nil
         } catch let validationError as IncidentReportValidationError {
             let labels = validationError.missingFields.map(fieldLabel).joined(separator: ", ")
             errorMessage = "Bitte fülle folgende Pflichtfelder aus: \(labels)."
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = store.lastError ?? error.localizedDescription
         }
+    }
+
+    private func resetReport() {
+        reportID = UUID()
+        reportCreatedAt = Date()
+        category = .unauthorizedVehicle
+        incidentAt = Date()
+        garageLocation = ""
+        licensePlate = ""
+        vehicleDescription = ""
+        violation = ReportCategory.unauthorizedVehicle.defaultViolation
+        notes = ""
+        witnesses = ""
+        evidencePhoto = nil
+        generatedPDF = nil
+        mailDraft = nil
+        errorMessage = nil
     }
 
     private func prepareMail(pdfURL: URL, recipient: String) {

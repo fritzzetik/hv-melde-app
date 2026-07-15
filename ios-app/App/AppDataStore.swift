@@ -63,21 +63,95 @@ final class AppDataStore: ObservableObject {
         return state.propertyManagements.first { $0.id == id }
     }
 
+    func saveReportedCase(
+        report: IncidentReport,
+        category: ReportCategory,
+        property: ManagedProperty,
+        generatedPDFURL: URL,
+        evidenceSHA256: String?
+    ) throws -> URL {
+        do {
+            let caseDirectory = casesDirectory.appendingPathComponent(report.id.uuidString, isDirectory: true)
+            try FileManager.default.createDirectory(at: caseDirectory, withIntermediateDirectories: true)
+            let pdfFileName = "Meldung-\(report.id.uuidString).pdf"
+            let permanentPDFURL = caseDirectory.appendingPathComponent(pdfFileName)
+            let pdfData = try Data(contentsOf: generatedPDFURL)
+            try pdfData.write(to: permanentPDFURL, options: [.atomic, .completeFileProtection])
+
+            let existing = state.reportedCases.first { $0.id == report.id }
+            let storedCase = StoredReportedCase(
+                id: report.id,
+                createdAt: report.createdAt,
+                updatedAt: Date(),
+                incidentAt: report.incidentAt,
+                propertyID: property.id,
+                propertyName: property.displayName,
+                propertyAddress: property.address,
+                occupancyRole: property.occupancyRole,
+                category: category,
+                garageLocation: report.garageLocation,
+                licensePlate: report.licensePlate,
+                vehicleDescription: report.vehicleDescription,
+                violation: report.violation,
+                notes: report.notes,
+                witnesses: report.witnesses,
+                status: existing?.status ?? .open,
+                completedAt: existing?.completedAt,
+                pdfFileName: pdfFileName,
+                evidenceSHA256: evidenceSHA256
+            )
+            if let index = state.reportedCases.firstIndex(where: { $0.id == report.id }) {
+                state.reportedCases[index] = storedCase
+            } else {
+                state.reportedCases.append(storedCase)
+            }
+            try persistState()
+            lastError = nil
+            return permanentPDFURL
+        } catch {
+            lastError = "Der Fall konnte nicht lokal gespeichert werden: \(error.localizedDescription)"
+            throw error
+        }
+    }
+
+    func setCaseStatus(_ status: ReportedCaseStatus, for id: UUID) {
+        guard let index = state.reportedCases.firstIndex(where: { $0.id == id }) else { return }
+        state.reportedCases[index].status = status
+        state.reportedCases[index].completedAt = status == .completed ? Date() : nil
+        state.reportedCases[index].updatedAt = Date()
+        persist()
+    }
+
+    func pdfURL(for reportedCase: StoredReportedCase) -> URL? {
+        let url = casesDirectory
+            .appendingPathComponent(reportedCase.id.uuidString, isDirectory: true)
+            .appendingPathComponent(reportedCase.pdfFileName)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
     func clearError() {
         lastError = nil
     }
 
     private func persist() {
         do {
-            let directory = fileURL.deletingLastPathComponent()
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            try encoder.encode(state).write(to: fileURL, options: .atomic)
+            try persistState()
             lastError = nil
         } catch {
             lastError = "Die Einstellungen konnten nicht gespeichert werden: \(error.localizedDescription)"
         }
+    }
+
+    private func persistState() throws {
+        let directory = fileURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(state).write(to: fileURL, options: [.atomic, .completeFileProtection])
+    }
+
+    private var casesDirectory: URL {
+        fileURL.deletingLastPathComponent().appendingPathComponent("Cases", isDirectory: true)
     }
 
     private static func load(from url: URL) -> AppDataState {

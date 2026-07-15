@@ -83,30 +83,125 @@ public struct PropertyManagement: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+public enum OccupancyRole: String, CaseIterable, Codable, Identifiable, Sendable {
+    case tenant = "Mieter"
+    case owner = "Eigentümer"
+
+    public var id: String { rawValue }
+}
+
 public struct ManagedProperty: Codable, Equatable, Identifiable, Sendable {
     public let id: UUID
     public var name: String
     public var address: PostalAddress
     public var propertyManagementID: UUID?
     public var reportEmail: String
+    public var occupancyRole: OccupancyRole
 
     public init(
         id: UUID = UUID(),
         name: String = "",
         address: PostalAddress = PostalAddress(),
         propertyManagementID: UUID? = nil,
-        reportEmail: String = ""
+        reportEmail: String = "",
+        occupancyRole: OccupancyRole = .tenant
     ) {
         self.id = id
         self.name = name
         self.address = address
         self.propertyManagementID = propertyManagementID
         self.reportEmail = reportEmail
+        self.occupancyRole = occupancyRole
     }
 
     public var displayName: String {
         let trimmedName = name.trimmed
         return trimmedName.isEmpty ? address.formatted : trimmedName
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, address, propertyManagementID, reportEmail, occupancyRole
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        address = try container.decode(PostalAddress.self, forKey: .address)
+        propertyManagementID = try container.decodeIfPresent(UUID.self, forKey: .propertyManagementID)
+        reportEmail = try container.decode(String.self, forKey: .reportEmail)
+        occupancyRole = try container.decodeIfPresent(OccupancyRole.self, forKey: .occupancyRole) ?? .tenant
+    }
+}
+
+public enum ReportedCaseStatus: String, CaseIterable, Codable, Identifiable, Sendable {
+    case open = "Offen"
+    case completed = "Erledigt"
+
+    public var id: String { rawValue }
+}
+
+public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
+    public let id: UUID
+    public let createdAt: Date
+    public var updatedAt: Date
+    public let incidentAt: Date
+    public let propertyID: UUID
+    public let propertyName: String
+    public let propertyAddress: PostalAddress
+    public let occupancyRole: OccupancyRole
+    public let category: ReportCategory
+    public let garageLocation: String
+    public let licensePlate: String
+    public let vehicleDescription: String
+    public let violation: String
+    public let notes: String
+    public let witnesses: String
+    public var status: ReportedCaseStatus
+    public var completedAt: Date?
+    public let pdfFileName: String
+    public let evidenceSHA256: String?
+
+    public init(
+        id: UUID,
+        createdAt: Date,
+        updatedAt: Date = Date(),
+        incidentAt: Date,
+        propertyID: UUID,
+        propertyName: String,
+        propertyAddress: PostalAddress,
+        occupancyRole: OccupancyRole,
+        category: ReportCategory,
+        garageLocation: String,
+        licensePlate: String,
+        vehicleDescription: String,
+        violation: String,
+        notes: String,
+        witnesses: String,
+        status: ReportedCaseStatus = .open,
+        completedAt: Date? = nil,
+        pdfFileName: String,
+        evidenceSHA256: String? = nil
+    ) {
+        self.id = id
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.incidentAt = incidentAt
+        self.propertyID = propertyID
+        self.propertyName = propertyName
+        self.propertyAddress = propertyAddress
+        self.occupancyRole = occupancyRole
+        self.category = category
+        self.garageLocation = garageLocation
+        self.licensePlate = licensePlate
+        self.vehicleDescription = vehicleDescription
+        self.violation = violation
+        self.notes = notes
+        self.witnesses = witnesses
+        self.status = status
+        self.completedAt = completedAt
+        self.pdfFileName = pdfFileName
+        self.evidenceSHA256 = evidenceSHA256
     }
 }
 
@@ -114,15 +209,30 @@ public struct AppDataState: Codable, Equatable, Sendable {
     public var profile: UserProfile
     public var properties: [ManagedProperty]
     public var propertyManagements: [PropertyManagement]
+    public var reportedCases: [StoredReportedCase]
 
     public init(
         profile: UserProfile = UserProfile(),
         properties: [ManagedProperty] = [],
-        propertyManagements: [PropertyManagement] = []
+        propertyManagements: [PropertyManagement] = [],
+        reportedCases: [StoredReportedCase] = []
     ) {
         self.profile = profile
         self.properties = properties
         self.propertyManagements = propertyManagements
+        self.reportedCases = reportedCases
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case profile, properties, propertyManagements, reportedCases
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        profile = try container.decodeIfPresent(UserProfile.self, forKey: .profile) ?? UserProfile()
+        properties = try container.decodeIfPresent([ManagedProperty].self, forKey: .properties) ?? []
+        propertyManagements = try container.decodeIfPresent([PropertyManagement].self, forKey: .propertyManagements) ?? []
+        reportedCases = try container.decodeIfPresent([StoredReportedCase].self, forKey: .reportedCases) ?? []
     }
 }
 
@@ -131,4 +241,3 @@ private extension String {
         trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
-

@@ -21,6 +21,9 @@ struct SettingsView: View {
                     } label: {
                         VStack(alignment: .leading) {
                             Text(property.displayName)
+                            Text(property.occupancyRole.rawValue)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                             if !property.address.formatted.isEmpty {
                                 Text(property.address.formatted)
                                     .font(.caption)
@@ -141,6 +144,11 @@ private struct PropertyEditorView: View {
         Form {
             Section("Objekt") {
                 TextField("Bezeichnung, z. B. Wohnung Wien", text: $property.name)
+                Picker("Nutzungsverhältnis", selection: $property.occupancyRole) {
+                    ForEach(OccupancyRole.allCases) { role in
+                        Text(role.rawValue).tag(role)
+                    }
+                }
             }
 
             AddressFields(address: $property.address)
