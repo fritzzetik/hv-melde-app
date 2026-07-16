@@ -50,6 +50,11 @@ final class AppDataStore: ObservableObject {
         persist()
     }
 
+    func setTechnicalAttachmentMode(_ mode: TechnicalAttachmentMode) {
+        state.preferences.technicalAttachmentMode = mode
+        persist()
+    }
+
     func upsert(_ property: ManagedProperty) {
         if let index = state.properties.firstIndex(where: { $0.id == property.id }) {
             state.properties[index] = property
@@ -98,6 +103,7 @@ final class AppDataStore: ObservableObject {
         category: ReportCategory,
         property: ManagedProperty,
         generatedPDFURL: URL,
+        generatedTechnicalJSONURL: URL?,
         evidenceSHA256: String?
     ) throws -> URL {
         do {
@@ -107,6 +113,15 @@ final class AppDataStore: ObservableObject {
             let permanentPDFURL = caseDirectory.appendingPathComponent(pdfFileName)
             let pdfData = try Data(contentsOf: generatedPDFURL)
             try pdfData.write(to: permanentPDFURL, options: [.atomic, .completeFileProtection])
+
+            let technicalJSONFileName = generatedTechnicalJSONURL.map { _ in
+                "Technische-Daten-\(report.id.uuidString).json"
+            }
+            if let generatedTechnicalJSONURL, let technicalJSONFileName {
+                let permanentJSONURL = caseDirectory.appendingPathComponent(technicalJSONFileName)
+                let jsonData = try Data(contentsOf: generatedTechnicalJSONURL)
+                try jsonData.write(to: permanentJSONURL, options: [.atomic, .completeFileProtection])
+            }
 
             let existing = state.reportedCases.first { $0.id == report.id }
             let storedCase = StoredReportedCase(
@@ -128,6 +143,7 @@ final class AppDataStore: ObservableObject {
                 status: existing?.status ?? .open,
                 completedAt: existing?.completedAt,
                 pdfFileName: pdfFileName,
+                technicalJSONFileName: technicalJSONFileName,
                 evidenceSHA256: evidenceSHA256,
                 isCommonArea: report.isCommonArea,
                 officialPropertyName: property.officialName,
@@ -182,6 +198,14 @@ final class AppDataStore: ObservableObject {
         let url = casesDirectory
             .appendingPathComponent(reportedCase.id.uuidString, isDirectory: true)
             .appendingPathComponent(reportedCase.pdfFileName)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    func technicalJSONURL(for reportedCase: StoredReportedCase) -> URL? {
+        guard let fileName = reportedCase.technicalJSONFileName else { return nil }
+        let url = casesDirectory
+            .appendingPathComponent(reportedCase.id.uuidString, isDirectory: true)
+            .appendingPathComponent(fileName)
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 

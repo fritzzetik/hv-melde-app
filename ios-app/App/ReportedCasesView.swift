@@ -256,7 +256,8 @@ private struct ReportedCaseDetailView: View {
             recipients: recipient.map { [$0] } ?? [],
             subject: subject,
             body: "Anbei übermittle ich erneut eine Kopie der bereits erstellten Meldung.",
-            attachmentURL: pdfURL
+            attachmentURL: pdfURL,
+            additionalAttachmentURLs: store.technicalJSONURL(for: reportedCase).map { [$0] } ?? []
         )
     }
 

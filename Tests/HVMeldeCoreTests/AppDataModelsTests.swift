@@ -86,7 +86,10 @@ func appDataRoundTrip() throws {
                 propertyType: .apartment
             )
         ],
-        preferences: AppPreferences(enhancedLocalAnalysisEnabled: true)
+        preferences: AppPreferences(
+            enhancedLocalAnalysisEnabled: true,
+            technicalAttachmentMode: .json
+        )
     )
 
     let decoded = try JSONDecoder().decode(AppDataState.self, from: JSONEncoder().encode(original))
@@ -123,6 +126,7 @@ func oldCaseWithoutAreaScopeDefaultsToOwnObject() throws {
     #expect(!decoded.concernsCommonArea)
     #expect(decoded.recipientPropertyName == "Bestandsobjekt")
     #expect(decoded.resolvedPropertyType == .apartment)
+    #expect(decoded.technicalJSONFileName == nil)
 }
 
 @Test("Bestehende lokale Daten ohne Rolle und Fallliste bleiben lesbar")
@@ -155,4 +159,5 @@ func oldAppDataMigratesWithDefaults() throws {
     #expect(decoded.properties.first?.address.unit == "")
     #expect(decoded.reportedCases.isEmpty)
     #expect(!decoded.preferences.enhancedLocalAnalysisEnabled)
+    #expect(decoded.preferences.technicalAttachmentMode == .none)
 }

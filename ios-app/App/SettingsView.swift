@@ -49,6 +49,24 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Meldungsdokument") {
+                Picker(
+                    "Technische Dokumentation",
+                    selection: Binding(
+                        get: { store.state.preferences.technicalAttachmentMode },
+                        set: { store.setTechnicalAttachmentMode($0) }
+                    )
+                ) {
+                    ForEach(TechnicalAttachmentMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+
+                Text("Der eigentliche Brief und die Beweisfotos bleiben übersichtlich. EXIF-Daten, Prüfsummen und Angaben zur lokalen Bilderkennung werden nur in der gewählten technischen Anlage ausgegeben.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Persönliche Daten") {
                 NavigationLink {
                     ProfileEditorView(profile: store.state.profile)

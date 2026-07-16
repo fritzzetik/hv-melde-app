@@ -211,6 +211,7 @@ public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
     public var status: ReportedCaseStatus
     public var completedAt: Date?
     public let pdfFileName: String
+    public let technicalJSONFileName: String?
     public let evidenceSHA256: String?
     public let isCommonArea: Bool?
     public let officialPropertyName: String?
@@ -235,6 +236,7 @@ public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
         status: ReportedCaseStatus = .open,
         completedAt: Date? = nil,
         pdfFileName: String,
+        technicalJSONFileName: String? = nil,
         evidenceSHA256: String? = nil,
         isCommonArea: Bool = false,
         officialPropertyName: String? = nil,
@@ -258,6 +260,7 @@ public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
         self.status = status
         self.completedAt = completedAt
         self.pdfFileName = pdfFileName
+        self.technicalJSONFileName = technicalJSONFileName
         self.evidenceSHA256 = evidenceSHA256
         self.isCommonArea = isCommonArea
         self.officialPropertyName = officialPropertyName
@@ -311,10 +314,33 @@ public struct AppDataState: Codable, Equatable, Sendable {
 
 public struct AppPreferences: Codable, Equatable, Sendable {
     public var enhancedLocalAnalysisEnabled: Bool
+    public var technicalAttachmentMode: TechnicalAttachmentMode
 
-    public init(enhancedLocalAnalysisEnabled: Bool = false) {
+    public init(
+        enhancedLocalAnalysisEnabled: Bool = false,
+        technicalAttachmentMode: TechnicalAttachmentMode = .none
+    ) {
         self.enhancedLocalAnalysisEnabled = enhancedLocalAnalysisEnabled
+        self.technicalAttachmentMode = technicalAttachmentMode
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case enhancedLocalAnalysisEnabled, technicalAttachmentMode
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        enhancedLocalAnalysisEnabled = try container.decodeIfPresent(Bool.self, forKey: .enhancedLocalAnalysisEnabled) ?? false
+        technicalAttachmentMode = try container.decodeIfPresent(TechnicalAttachmentMode.self, forKey: .technicalAttachmentMode) ?? .none
+    }
+}
+
+public enum TechnicalAttachmentMode: String, CaseIterable, Codable, Identifiable, Sendable {
+    case none = "Keine technische Anlage"
+    case pdf = "Technische Anlage im PDF"
+    case json = "Technische Daten als JSON"
+
+    public var id: String { rawValue }
 }
 
 private extension String {

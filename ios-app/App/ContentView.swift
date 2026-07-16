@@ -82,6 +82,7 @@ private struct NewReportView: View {
     @State private var witnesses = ""
     @State private var evidencePhotos: [EvidencePhoto] = []
     @State private var generatedPDF: URL?
+    @State private var generatedTechnicalJSON: URL?
     @State private var mailDraft: MailDraft?
     @State private var errorMessage: String?
     @State private var didRestoreDraft = false
@@ -158,6 +159,10 @@ private struct NewReportView: View {
             .onChange(of: store.state.properties) { _, _ in selectFirstPropertyIfNeeded() }
             .onChange(of: selectedPropertyID) { _, _ in generatedPDF = nil }
             .onChange(of: evidencePhotos.map(\.id)) { _, _ in generatedPDF = nil }
+            .onChange(of: store.state.preferences.technicalAttachmentMode) { _, _ in
+                generatedPDF = nil
+                generatedTechnicalJSON = nil
+            }
             .onChange(of: currentDraft) { _, draft in
                 guard didRestoreDraft else { return }
                 store.saveDraft(draft)
@@ -346,17 +351,34 @@ private struct NewReportView: View {
                 profile: store.state.profile,
                 property: property,
                 management: store.management(for: property),
-                evidencePhotos: evidencePhotos
+                evidencePhotos: evidencePhotos,
+                technicalAttachmentMode: store.state.preferences.technicalAttachmentMode
             )
+            let temporaryJSON = store.state.preferences.technicalAttachmentMode == .json
+                ? try TechnicalReportExporter.exportJSON(
+                    report: report,
+                    profile: store.state.profile,
+                    property: property,
+                    management: store.management(for: property),
+                    evidencePhotos: evidencePhotos
+                )
+                : nil
             generatedPDF = try store.saveReportedCase(
                 report: report,
                 category: category,
                 property: property,
                 generatedPDFURL: temporaryPDF,
+                generatedTechnicalJSONURL: temporaryJSON,
                 evidenceSHA256: evidencePhotos.isEmpty
                     ? nil
                     : evidencePhotos.map(\.sha256).joined(separator: ", ")
             )
+            if temporaryJSON != nil,
+               let storedCase = store.state.reportedCases.first(where: { $0.id == report.id }) {
+                generatedTechnicalJSON = store.technicalJSONURL(for: storedCase)
+            } else {
+                generatedTechnicalJSON = nil
+            }
             errorMessage = nil
             store.clearDraft()
             hasUnsavedDraft = false
@@ -382,6 +404,7 @@ private struct NewReportView: View {
         witnesses = ""
         evidencePhotos = []
         generatedPDF = nil
+        generatedTechnicalJSON = nil
         mailDraft = nil
         errorMessage = nil
         store.clearDraft()
@@ -487,7 +510,8 @@ private struct NewReportView: View {
             recipients: [recipient],
             subject: subject,
             body: "Guten Tag,\n\nim Anhang übermittle ich die Dokumentation des Vorfalls.\n\nMit freundlichen Grüßen\n\(store.state.profile.fullName)",
-            attachmentURL: pdfURL
+            attachmentURL: pdfURL,
+            additionalAttachmentURLs: generatedTechnicalJSON.map { [$0] } ?? []
         )
     }
 

@@ -7,6 +7,21 @@ struct MailDraft: Identifiable {
     let subject: String
     let body: String
     let attachmentURL: URL
+    let additionalAttachmentURLs: [URL]
+
+    init(
+        recipients: [String],
+        subject: String,
+        body: String,
+        attachmentURL: URL,
+        additionalAttachmentURLs: [URL] = []
+    ) {
+        self.recipients = recipients
+        self.subject = subject
+        self.body = body
+        self.attachmentURL = attachmentURL
+        self.additionalAttachmentURLs = additionalAttachmentURLs
+    }
 }
 
 struct MailComposerView: UIViewControllerRepresentable {
@@ -24,12 +39,14 @@ struct MailComposerView: UIViewControllerRepresentable {
         controller.setSubject(draft.subject)
         controller.setMessageBody(draft.body, isHTML: false)
 
-        if let data = try? Data(contentsOf: draft.attachmentURL) {
-            controller.addAttachmentData(
-                data,
-                mimeType: "application/pdf",
-                fileName: draft.attachmentURL.lastPathComponent
-            )
+        for url in [draft.attachmentURL] + draft.additionalAttachmentURLs {
+            if let data = try? Data(contentsOf: url) {
+                controller.addAttachmentData(
+                    data,
+                    mimeType: url.pathExtension.lowercased() == "json" ? "application/json" : "application/pdf",
+                    fileName: url.lastPathComponent
+                )
+            }
         }
         return controller
     }
@@ -52,4 +69,3 @@ struct MailComposerView: UIViewControllerRepresentable {
         }
     }
 }
-

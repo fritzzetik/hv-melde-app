@@ -8,13 +8,20 @@ enum PDFReportRenderer {
         profile: UserProfile,
         property: ManagedProperty,
         management: PropertyManagement?,
-        evidencePhotos: [EvidencePhoto]
+        evidencePhotos: [EvidencePhoto],
+        technicalAttachmentMode: TechnicalAttachmentMode
     ) throws -> URL {
         let pageBounds = CGRect(x: 0, y: 0, width: 595, height: 842)
         let renderer = UIGraphicsPDFRenderer(bounds: pageBounds)
         let analysisCount = evidencePhotos.filter { $0.confirmedAnalysis != nil }.count
-        let totalPages = 2 + evidencePhotos.count + analysisCount
-        let attachmentTitles = attachmentSummary(for: evidencePhotos)
+        let technicalPageCount = technicalAttachmentMode == .pdf
+            ? 1 + evidencePhotos.count + analysisCount
+            : 0
+        let totalPages = 1 + evidencePhotos.count + technicalPageCount
+        let attachmentTitles = attachmentSummary(
+            for: evidencePhotos,
+            technicalAttachmentMode: technicalAttachmentMode
+        )
         let data = renderer.pdfData { context in
             var pageNumber = 1
             context.beginPage()
@@ -24,28 +31,47 @@ enum PDFReportRenderer {
                 property: property,
                 management: management,
                 attachmentTitles: attachmentTitles,
+                technicalAttachmentMode: technicalAttachmentMode,
                 in: pageBounds
             )
             drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
 
-            pageNumber += 1
-            context.beginPage()
-            drawCaseDetails(report, profile: profile, property: property, management: management, in: pageBounds)
-            drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
-
-            var attachmentNumber = 2
+            var attachmentNumber = 1
             for evidencePhoto in evidencePhotos {
                 pageNumber += 1
                 context.beginPage()
                 drawEvidencePhoto(evidencePhoto, attachmentNumber: attachmentNumber, in: pageBounds)
                 drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
                 attachmentNumber += 1
-                if let analysis = evidencePhoto.confirmedAnalysis {
+            }
+
+            if technicalAttachmentMode == .pdf {
+                pageNumber += 1
+                context.beginPage()
+                drawCaseDetails(
+                    report,
+                    profile: profile,
+                    property: property,
+                    management: management,
+                    attachmentNumber: attachmentNumber,
+                    in: pageBounds
+                )
+                drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
+                attachmentNumber += 1
+
+                for evidencePhoto in evidencePhotos {
                     pageNumber += 1
                     context.beginPage()
-                    drawConfirmedAnalysis(analysis, attachmentNumber: attachmentNumber, in: pageBounds)
+                    drawTechnicalEvidencePhoto(evidencePhoto, attachmentNumber: attachmentNumber, in: pageBounds)
                     drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
                     attachmentNumber += 1
+                    if let analysis = evidencePhoto.confirmedAnalysis {
+                        pageNumber += 1
+                        context.beginPage()
+                        drawConfirmedAnalysis(analysis, attachmentNumber: attachmentNumber, in: pageBounds)
+                        drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
+                        attachmentNumber += 1
+                    }
                 }
             }
         }
@@ -66,7 +92,63 @@ enum PDFReportRenderer {
         var y = margin
 
         y = drawText(
-            "Anlage \(attachmentNumber) - Beweisfoto und technische Angaben",
+            "Anlage \(attachmentNumber) - Beweisfoto",
+            at: y,
+            width: contentWidth,
+            font: .boldSystemFont(ofSize: 20),
+            color: .label,
+            margin: margin
+        ) + 18
+
+        if let image = UIImage(data: photo.data) {
+            let maximumImageSize = CGSize(width: contentWidth, height: 590)
+            let scale = min(maximumImageSize.width / image.size.width, maximumImageSize.height / image.size.height)
+            let imageSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+            let imageRect = CGRect(
+                x: margin + (contentWidth - imageSize.width) / 2,
+                y: y,
+                width: imageSize.width,
+                height: imageSize.height
+            )
+            image.draw(in: imageRect)
+            y = imageRect.maxY + 18
+        }
+
+        if let capturedAt = photo.imageTimestamp.capturedAt {
+            y = drawText(
+                "Aufgenommen am \(dateFormatter.string(from: capturedAt))",
+                at: y,
+                width: contentWidth,
+                font: .systemFont(ofSize: 10.5),
+                color: .secondaryLabel,
+                margin: margin
+            ) + 10
+        }
+
+        if let description = photo.confirmedAnalysis?.confirmedSceneSummary,
+           !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            _ = drawText(
+                letterSummary(description),
+                at: y,
+                width: contentWidth,
+                font: .systemFont(ofSize: 11),
+                color: .label,
+                margin: margin
+            )
+        }
+    }
+
+    private static func drawTechnicalEvidencePhoto(
+        _ photo: EvidencePhoto,
+        attachmentNumber: Int,
+        in bounds: CGRect
+    ) {
+        let margin: CGFloat = 48
+        let contentWidth = bounds.width - (2 * margin)
+        var y = margin
+
+        y = drawText(
+            "Technische Anlage \(attachmentNumber) - Fotodaten",
             at: y,
             width: contentWidth,
             font: .boldSystemFont(ofSize: 20),
@@ -75,11 +157,8 @@ enum PDFReportRenderer {
         ) + 14
 
         if let image = UIImage(data: photo.data) {
-            let maximumImageSize = CGSize(width: contentWidth, height: 430)
-            let scale = min(
-                maximumImageSize.width / image.size.width,
-                maximumImageSize.height / image.size.height
-            )
+            let maximumImageSize = CGSize(width: contentWidth, height: 330)
+            let scale = min(maximumImageSize.width / image.size.width, maximumImageSize.height / image.size.height)
             let imageSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
             let imageRect = CGRect(
                 x: margin + (contentWidth - imageSize.width) / 2,
@@ -89,57 +168,32 @@ enum PDFReportRenderer {
             )
             image.draw(in: imageRect)
             y = imageRect.maxY + 14
-        } else {
-            y = drawText(
-                "Das gespeicherte Originalbild konnte nicht dargestellt werden.",
-                at: y,
-                width: contentWidth,
-                font: .systemFont(ofSize: 11),
-                color: .systemRed,
-                margin: margin
-            ) + 12
         }
 
-        let captureValue: String
-        if let capturedAt = photo.imageTimestamp.capturedAt {
-            captureValue = dateFormatter.string(from: capturedAt)
-        } else {
-            captureValue = "Nicht in den Bildmetadaten vorhanden"
-        }
-
+        let captureValue = photo.imageTimestamp.capturedAt.map {
+            dateFormatter.string(from: $0)
+        } ?? "Nicht in den Bildmetadaten vorhanden"
         let timeZoneValue: String
         if photo.imageTimestamp.timeZoneWasEmbedded {
-            timeZoneValue = "Im Bild enthalten bzw. bei direkter Kameraaufnahme durch die Geräteuhr bestimmt (\(photo.imageTimestamp.interpretedTimeZone ?? "unbekannt"))"
+            timeZoneValue = "Im Bild enthalten bzw. durch die Geräteuhr bestimmt (\(photo.imageTimestamp.interpretedTimeZone ?? "unbekannt"))"
         } else if let interpretedTimeZone = photo.imageTimestamp.interpretedTimeZone {
             timeZoneValue = "Nicht im Bild enthalten; als \(interpretedTimeZone) interpretiert"
         } else {
             timeZoneValue = "Nicht verfügbar"
         }
 
-        let hashForDisplay = photo.sha256.chunked(every: 32).joined(separator: " ")
-        var rows: [(String, String)] = [
+        let rows: [(String, String)] = [
             ("Fotoquelle", photo.source.rawValue),
             ("Aufnahmezeit des Bildes", captureValue),
             ("Zeitquelle", photo.imageTimestamp.source.rawValue),
             ("Zeitzonenangabe", timeZoneValue),
             ("Originaler Metadatenwert", photo.imageTimestamp.rawValue ?? "Nicht verfügbar"),
             ("In die App übernommen", dateFormatter.string(from: photo.importedAt)),
-            ("SHA-256 des Originalbilds", hashForDisplay)
+            ("SHA-256 des Originalbilds", photo.sha256.chunked(every: 32).joined(separator: " "))
         ]
 
-        if photo.confirmedAnalysis == nil {
-            rows.append(("Lokale Bilderkennung", "Noch nicht durch die Nutzerin oder den Nutzer bestätigt"))
-        }
-
-        for (label, value) in rows where !value.isEmpty {
-            y = drawText(
-                label.uppercased(),
-                at: y,
-                width: contentWidth,
-                font: .boldSystemFont(ofSize: 8),
-                color: .secondaryLabel,
-                margin: margin
-            ) + 2
+        for (label, value) in rows {
+            y = drawText(label.uppercased(), at: y, width: contentWidth, font: .boldSystemFont(ofSize: 8), color: .secondaryLabel, margin: margin) + 2
             y = drawText(
                 value,
                 at: y,
@@ -161,7 +215,7 @@ enum PDFReportRenderer {
         var y = margin
 
         y = drawText(
-            "Anlage \(attachmentNumber) - Bestätigte lokale Bildauswertung",
+            "Technische Anlage \(attachmentNumber) - Bildauswertung",
             at: y,
             width: contentWidth,
             font: .boldSystemFont(ofSize: 20),
@@ -240,6 +294,7 @@ enum PDFReportRenderer {
         property: ManagedProperty,
         management: PropertyManagement?,
         attachmentTitles: [String],
+        technicalAttachmentMode: TechnicalAttachmentMode,
         in bounds: CGRect
     ) {
         let margin: CGFloat = 50
@@ -263,7 +318,7 @@ enum PDFReportRenderer {
             margin: margin
         )
         drawRightAlignedText(
-            "MELDUNG / DOKUMENTATION",
+            "MELDUNG",
             at: y,
             font: .boldSystemFont(ofSize: 8),
             color: accentColor,
@@ -382,14 +437,19 @@ enum PDFReportRenderer {
             ) + 15
         }
 
-        y = drawText(
-            "Die vollständigen Falldaten und - soweit vorhanden - die Foto- und Analysedokumentation finden Sie in den beigefügten Anlagen.",
-            at: y,
-            width: contentWidth,
-            font: .systemFont(ofSize: 11),
-            color: .label,
-            margin: margin
-        ) + 18
+        if !attachmentTitles.isEmpty {
+            let attachmentSentence = technicalAttachmentMode == .json
+                ? "Die Beweisfotos finden Sie im PDF. Technische Daten sind zusätzlich als maschinenlesbare JSON-Datei beigefügt."
+                : "Die zugehörigen Beweisfotos und gegebenenfalls die technische Dokumentation finden Sie in den Anlagen."
+            y = drawText(
+                attachmentSentence,
+                at: y,
+                width: contentWidth,
+                font: .systemFont(ofSize: 11),
+                color: .label,
+                margin: margin
+            ) + 18
+        }
 
         y = drawText(
             "Mit freundlichen Grüßen\n\n\(profile.fullName)",
@@ -400,29 +460,40 @@ enum PDFReportRenderer {
             margin: margin
         ) + 18
 
-        _ = drawText(
-            "Anlagen\n" + attachmentTitles.joined(separator: "\n"),
-            at: y,
-            width: contentWidth,
-            font: .systemFont(ofSize: 9.5),
-            color: .secondaryLabel,
-            margin: margin
-        )
+        if !attachmentTitles.isEmpty {
+            _ = drawText(
+                "Anlagen\n" + attachmentTitles.joined(separator: "\n"),
+                at: y,
+                width: contentWidth,
+                font: .systemFont(ofSize: 9.5),
+                color: .secondaryLabel,
+                margin: margin
+            )
+        }
     }
 
-    private static func attachmentSummary(for photos: [EvidencePhoto]) -> [String] {
-        var titles = ["1. Falldetails und Meldungsdaten"]
-        guard !photos.isEmpty else { return titles }
-        let analysisCount = photos.filter { $0.confirmedAnalysis != nil }.count
-        let lastNumber = 1 + photos.count + analysisCount
-        var description = "\(photos.count) Beweisfoto"
-        if photos.count != 1 { description += "s" }
-        description += " mit technischen Angaben"
-        if analysisCount > 0 {
-            description += " und \(analysisCount) bestätigte Bildauswertung"
-            if analysisCount != 1 { description += "en" }
+    private static func attachmentSummary(
+        for photos: [EvidencePhoto],
+        technicalAttachmentMode: TechnicalAttachmentMode
+    ) -> [String] {
+        var titles: [String] = []
+        if photos.count == 1 {
+            titles.append("1. Beweisfoto")
+        } else if photos.count > 1 {
+            titles.append("1-\(photos.count). \(photos.count) Beweisfotos")
         }
-        titles.append("2–\(lastNumber). \(description)")
+
+        if technicalAttachmentMode == .pdf {
+            let analysisCount = photos.filter { $0.confirmedAnalysis != nil }.count
+            let firstNumber = photos.count + 1
+            let lastNumber = photos.count + 1 + photos.count + analysisCount
+            let numberRange = firstNumber == lastNumber
+                ? "\(firstNumber)."
+                : "\(firstNumber)-\(lastNumber)."
+            titles.append("\(numberRange) Technische Dokumentation")
+        } else if technicalAttachmentMode == .json {
+            titles.append("Technische Daten (separate JSON-Datei)")
+        }
         return titles
     }
 
@@ -431,6 +502,7 @@ enum PDFReportRenderer {
         profile: UserProfile,
         property: ManagedProperty,
         management: PropertyManagement?,
+        attachmentNumber: Int,
         in bounds: CGRect
     ) {
         let margin: CGFloat = 48
@@ -438,7 +510,7 @@ enum PDFReportRenderer {
         var y = margin
 
         y = drawText(
-            "Anlage 1 - Falldetails und Meldungsdaten",
+            "Technische Anlage \(attachmentNumber) - Falldaten",
             at: y,
             width: contentWidth,
             font: .boldSystemFont(ofSize: 20),
@@ -610,10 +682,13 @@ enum PDFReportRenderer {
     }
 
     private static func letterSummary(_ text: String) -> String {
-        let maximumLength = 360
-        guard text.count > maximumLength else { return text }
-        let end = text.index(text.startIndex, offsetBy: maximumLength)
-        return String(text[..<end]) + "… (vollständig in Anlage 1)"
+        let cleaned = text
+            .replacingOccurrences(of: "**", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let maximumLength = 500
+        guard cleaned.count > maximumLength else { return cleaned }
+        let end = cleaned.index(cleaned.startIndex, offsetBy: maximumLength)
+        return String(cleaned[..<end]) + "…"
     }
 
     private static let accentColor = UIColor(red: 0.08, green: 0.31, blue: 0.52, alpha: 1)

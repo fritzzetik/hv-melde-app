@@ -21,3 +21,5 @@ Thumbs.db
 .env
 *.p8
 
+# Local PDF render checks
+tmp/pdfs/
