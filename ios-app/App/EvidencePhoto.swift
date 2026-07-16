@@ -52,6 +52,13 @@ private struct EvidencePhotoMetadata: Codable, Sendable {
 }
 
 enum EvidencePhotoStore {
+    static func cloudMetadataData(for photo: EvidencePhoto) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.sortedKeys]
+        return try encoder.encode(metadata(for: photo))
+    }
+
     static func store(
         data: Data,
         reportID: UUID,
@@ -159,7 +166,18 @@ enum EvidencePhotoStore {
     }
 
     private static func writeMetadata(for photo: EvidencePhoto) throws {
-        let metadata = EvidencePhotoMetadata(
+        let metadata = metadata(for: photo)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let metadataURL = photo.localURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("metadata-\(photo.id.uuidString).json")
+        try encoder.encode(metadata).write(to: metadataURL, options: [.atomic, .completeFileProtection])
+    }
+
+    private static func metadata(for photo: EvidencePhoto) -> EvidencePhotoMetadata {
+        EvidencePhotoMetadata(
             id: photo.id,
             reportID: photo.reportID,
             fileName: photo.localURL.lastPathComponent,
@@ -169,13 +187,6 @@ enum EvidencePhotoStore {
             imageTimestamp: photo.imageTimestamp,
             confirmedAnalysis: photo.confirmedAnalysis
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let metadataURL = photo.localURL
-            .deletingLastPathComponent()
-            .appendingPathComponent("metadata-\(photo.id.uuidString).json")
-        try encoder.encode(metadata).write(to: metadataURL, options: [.atomic, .completeFileProtection])
     }
 
     private static func sanitize(_ fileExtension: String?) -> String? {

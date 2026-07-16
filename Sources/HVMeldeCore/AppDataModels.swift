@@ -192,6 +192,50 @@ public enum ReportedCaseStatus: String, CaseIterable, Codable, Identifiable, Sen
     public var id: String { rawValue }
 }
 
+public enum CloudCaseFileKind: String, Codable, Sendable {
+    case pdf
+    case photo
+    case technicalJSON
+}
+
+public struct CloudCaseFileReference: Codable, Equatable, Identifiable, Sendable {
+    public let id: UUID
+    public let recordName: String
+    public let kind: CloudCaseFileKind
+    public let fileName: String
+    public let sha256: String
+    public let createdAt: Date
+    public let metadata: Data?
+
+    public init(
+        id: UUID,
+        caseID: UUID,
+        kind: CloudCaseFileKind,
+        fileName: String,
+        sha256: String,
+        createdAt: Date,
+        metadata: Data? = nil
+    ) {
+        self.id = id
+        self.recordName = "case-\(caseID.uuidString.lowercased())-\(kind.rawValue)-\(id.uuidString.lowercased())"
+        self.kind = kind
+        self.fileName = fileName
+        self.sha256 = sha256
+        self.createdAt = createdAt
+        self.metadata = metadata
+    }
+}
+
+public struct DeletedCaseTombstone: Codable, Equatable, Identifiable, Sendable {
+    public let id: UUID
+    public let deletedAt: Date
+
+    public init(id: UUID, deletedAt: Date = Date()) {
+        self.id = id
+        self.deletedAt = deletedAt
+    }
+}
+
 public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
     public let id: UUID
     public let createdAt: Date
@@ -216,6 +260,7 @@ public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
     public let isCommonArea: Bool?
     public let officialPropertyName: String?
     public let propertyType: PropertyType?
+    public var cloudFiles: [CloudCaseFileReference]?
 
     public init(
         id: UUID,
@@ -240,7 +285,8 @@ public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
         evidenceSHA256: String? = nil,
         isCommonArea: Bool = false,
         officialPropertyName: String? = nil,
-        propertyType: PropertyType? = nil
+        propertyType: PropertyType? = nil,
+        cloudFiles: [CloudCaseFileReference]? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -265,6 +311,7 @@ public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
         self.isCommonArea = isCommonArea
         self.officialPropertyName = officialPropertyName
         self.propertyType = propertyType
+        self.cloudFiles = cloudFiles
     }
 
     public var concernsCommonArea: Bool { isCommonArea ?? false }
@@ -283,23 +330,30 @@ public struct AppDataState: Codable, Equatable, Sendable {
     public var propertyManagements: [PropertyManagement]
     public var reportedCases: [StoredReportedCase]
     public var preferences: AppPreferences
+    public var deletedCases: [DeletedCaseTombstone]
+    public var deletedCloudFileRecordNames: [String]
 
     public init(
         profile: UserProfile = UserProfile(),
         properties: [ManagedProperty] = [],
         propertyManagements: [PropertyManagement] = [],
         reportedCases: [StoredReportedCase] = [],
-        preferences: AppPreferences = AppPreferences()
+        preferences: AppPreferences = AppPreferences(),
+        deletedCases: [DeletedCaseTombstone] = [],
+        deletedCloudFileRecordNames: [String] = []
     ) {
         self.profile = profile
         self.properties = properties
         self.propertyManagements = propertyManagements
         self.reportedCases = reportedCases
         self.preferences = preferences
+        self.deletedCases = deletedCases
+        self.deletedCloudFileRecordNames = deletedCloudFileRecordNames
     }
 
     private enum CodingKeys: String, CodingKey {
         case profile, properties, propertyManagements, reportedCases, preferences
+        case deletedCases, deletedCloudFileRecordNames
     }
 
     public init(from decoder: Decoder) throws {
@@ -309,6 +363,8 @@ public struct AppDataState: Codable, Equatable, Sendable {
         propertyManagements = try container.decodeIfPresent([PropertyManagement].self, forKey: .propertyManagements) ?? []
         reportedCases = try container.decodeIfPresent([StoredReportedCase].self, forKey: .reportedCases) ?? []
         preferences = try container.decodeIfPresent(AppPreferences.self, forKey: .preferences) ?? AppPreferences()
+        deletedCases = try container.decodeIfPresent([DeletedCaseTombstone].self, forKey: .deletedCases) ?? []
+        deletedCloudFileRecordNames = try container.decodeIfPresent([String].self, forKey: .deletedCloudFileRecordNames) ?? []
     }
 }
 

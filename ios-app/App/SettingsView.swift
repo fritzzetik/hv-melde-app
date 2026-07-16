@@ -27,7 +27,7 @@ struct SettingsView: View {
                     .disabled(store.iCloudSyncStatus == .syncing)
                 }
 
-                Text("Profil, Hausverwaltungen, Objekte und Falldaten werden in deinem privaten iCloud-Bereich gespeichert. Fotos und PDFs bleiben in dieser Version ausschließlich auf diesem Gerät.")
+                Text("Profil, Hausverwaltungen, Objekte, Falldaten, Fotos und erzeugte Dokumente werden in deinem privaten iCloud-Bereich gespeichert. Beim ersten Sync können vorhandene Fälle etwas länger dauern.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

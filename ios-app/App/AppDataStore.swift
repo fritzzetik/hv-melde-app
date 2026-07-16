@@ -1,4 +1,5 @@
 import Combine
+import CryptoKit
 import Foundation
 import HVMeldeCore
 
@@ -106,7 +107,8 @@ final class AppDataStore: ObservableObject {
         property: ManagedProperty,
         generatedPDFURL: URL,
         generatedTechnicalJSONURL: URL?,
-        evidenceSHA256: String?
+        evidenceSHA256: String?,
+        evidencePhotos: [EvidencePhoto]
     ) throws -> URL {
         do {
             let caseDirectory = casesDirectory.appendingPathComponent(report.id.uuidString, isDirectory: true)
@@ -125,7 +127,46 @@ final class AppDataStore: ObservableObject {
                 try jsonData.write(to: permanentJSONURL, options: [.atomic, .completeFileProtection])
             }
 
+            var cloudFiles = [CloudCaseFileReference(
+                id: report.id,
+                caseID: report.id,
+                kind: .pdf,
+                fileName: pdfFileName,
+                sha256: Self.sha256(pdfData),
+                createdAt: report.createdAt
+            )]
+            if let technicalJSONFileName {
+                let jsonURL = caseDirectory.appendingPathComponent(technicalJSONFileName)
+                let jsonData = try Data(contentsOf: jsonURL)
+                cloudFiles.append(CloudCaseFileReference(
+                    id: report.id,
+                    caseID: report.id,
+                    kind: .technicalJSON,
+                    fileName: technicalJSONFileName,
+                    sha256: Self.sha256(jsonData),
+                    createdAt: report.createdAt
+                ))
+            }
+            for photo in evidencePhotos {
+                cloudFiles.append(CloudCaseFileReference(
+                    id: photo.id,
+                    caseID: report.id,
+                    kind: .photo,
+                    fileName: photo.localURL.lastPathComponent,
+                    sha256: photo.sha256,
+                    createdAt: photo.importedAt,
+                    metadata: try EvidencePhotoStore.cloudMetadataData(for: photo)
+                ))
+            }
+
             let existing = state.reportedCases.first { $0.id == report.id }
+            let newRecordNames = Set(cloudFiles.map(\.recordName))
+            let obsoleteRecordNames = Set(existing?.cloudFiles?.map(\.recordName) ?? [])
+                .subtracting(newRecordNames)
+            state.deletedCloudFileRecordNames = Array(
+                Set(state.deletedCloudFileRecordNames).union(obsoleteRecordNames)
+            ).sorted()
+            state.deletedCases.removeAll { $0.id == report.id }
             let storedCase = StoredReportedCase(
                 id: report.id,
                 createdAt: report.createdAt,
@@ -149,7 +190,8 @@ final class AppDataStore: ObservableObject {
                 evidenceSHA256: evidenceSHA256,
                 isCommonArea: report.isCommonArea,
                 officialPropertyName: property.officialName,
-                propertyType: property.propertyType
+                propertyType: property.propertyType,
+                cloudFiles: cloudFiles
             )
             if let index = state.reportedCases.firstIndex(where: { $0.id == report.id }) {
                 state.reportedCases[index] = storedCase
@@ -176,13 +218,20 @@ final class AppDataStore: ObservableObject {
 
     func deleteReportedCase(_ id: UUID) {
         guard let index = state.reportedCases.firstIndex(where: { $0.id == id }) else { return }
+        let previousState = state
         let removedCase = state.reportedCases.remove(at: index)
+        state.deletedCases.removeAll { $0.id == id }
+        state.deletedCases.append(DeletedCaseTombstone(id: id))
+        state.deletedCloudFileRecordNames = Array(
+            Set(state.deletedCloudFileRecordNames)
+                .union(removedCase.cloudFiles?.map(\.recordName) ?? [])
+        ).sorted()
 
         do {
             try persistState()
             scheduleCloudSync()
         } catch {
-            state.reportedCases.insert(removedCase, at: index)
+            state = previousState
             lastError = "Die Meldung konnte nicht gelöscht werden: \(error.localizedDescription)"
             return
         }
@@ -243,6 +292,8 @@ final class AppDataStore: ObservableObject {
                 iCloudSyncStatus = .unavailable("Kein aktives iCloud-Konto")
                 return
             }
+            try await prepareCloudFileManifests()
+            let previousCaseIDs = Set(state.reportedCases.map(\.id))
             let result = try await cloudSyncService.synchronize(
                 localState: state,
                 localModifiedAt: stateModifiedAt,
@@ -250,6 +301,12 @@ final class AppDataStore: ObservableObject {
             )
             state = result.state
             try persistState(markAsLocalChange: false)
+            let removedCaseIDs = previousCaseIDs.subtracting(state.reportedCases.map(\.id))
+            for id in removedCaseIDs {
+                try removeDirectoryIfPresent(casesDirectory.appendingPathComponent(id.uuidString, isDirectory: true))
+                try removeDirectoryIfPresent(evidenceDirectory.appendingPathComponent(id.uuidString, isDirectory: true))
+            }
+            try await cloudSyncService.synchronizeFiles(in: state, baseDirectory: baseDirectory)
             stateModifiedAt = result.synchronizedAt
             lastCloudSyncAt = result.synchronizedAt
             UserDefaults.standard.set(result.synchronizedAt, forKey: Self.lastCloudSyncAtKey)
@@ -329,6 +386,59 @@ final class AppDataStore: ObservableObject {
         fileURL.deletingLastPathComponent().appendingPathComponent("Evidence", isDirectory: true)
     }
 
+    private var baseDirectory: URL {
+        fileURL.deletingLastPathComponent()
+    }
+
+    private func prepareCloudFileManifests() async throws {
+        var changed = false
+        for index in state.reportedCases.indices where state.reportedCases[index].cloudFiles == nil {
+            let reportedCase = state.reportedCases[index]
+            var references: [CloudCaseFileReference] = []
+            if let pdfURL = pdfURL(for: reportedCase) {
+                let data = try Data(contentsOf: pdfURL)
+                references.append(CloudCaseFileReference(
+                    id: reportedCase.id,
+                    caseID: reportedCase.id,
+                    kind: .pdf,
+                    fileName: reportedCase.pdfFileName,
+                    sha256: Self.sha256(data),
+                    createdAt: reportedCase.createdAt
+                ))
+            }
+            if let jsonURL = technicalJSONURL(for: reportedCase) {
+                let data = try Data(contentsOf: jsonURL)
+                references.append(CloudCaseFileReference(
+                    id: reportedCase.id,
+                    caseID: reportedCase.id,
+                    kind: .technicalJSON,
+                    fileName: jsonURL.lastPathComponent,
+                    sha256: Self.sha256(data),
+                    createdAt: reportedCase.createdAt
+                ))
+            }
+            let photos = try await EvidencePhotoStore.loadAll(for: reportedCase.id)
+            for photo in photos {
+                references.append(CloudCaseFileReference(
+                    id: photo.id,
+                    caseID: reportedCase.id,
+                    kind: .photo,
+                    fileName: photo.localURL.lastPathComponent,
+                    sha256: photo.sha256,
+                    createdAt: photo.importedAt,
+                    metadata: try EvidencePhotoStore.cloudMetadataData(for: photo)
+                ))
+            }
+            guard !references.isEmpty else { continue }
+            state.reportedCases[index].cloudFiles = references
+            state.reportedCases[index].updatedAt = Date()
+            changed = true
+        }
+        if changed {
+            try persistState()
+        }
+    }
+
     private func removeDirectoryIfPresent(_ url: URL) throws {
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         try FileManager.default.removeItem(at: url)
@@ -361,6 +471,10 @@ final class AppDataStore: ObservableObject {
 
     private static func modificationDate(for url: URL) -> Date? {
         try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+    }
+
+    private static func sha256(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
 }

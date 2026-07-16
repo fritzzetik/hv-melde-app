@@ -127,6 +127,7 @@ func oldCaseWithoutAreaScopeDefaultsToOwnObject() throws {
     #expect(decoded.recipientPropertyName == "Bestandsobjekt")
     #expect(decoded.resolvedPropertyType == .apartment)
     #expect(decoded.technicalJSONFileName == nil)
+    #expect(decoded.cloudFiles == nil)
 }
 
 @Test("Bestehende lokale Daten ohne Rolle und Fallliste bleiben lesbar")
@@ -160,4 +161,49 @@ func oldAppDataMigratesWithDefaults() throws {
     #expect(decoded.reportedCases.isEmpty)
     #expect(!decoded.preferences.enhancedLocalAnalysisEnabled)
     #expect(decoded.preferences.technicalAttachmentMode == .none)
+    #expect(decoded.deletedCases.isEmpty)
+    #expect(decoded.deletedCloudFileRecordNames.isEmpty)
+}
+
+@Test("Cloud-Dateiliste bleibt im verschlüsselten App-Snapshot erhalten")
+func cloudFileManifestRoundTrip() throws {
+    let caseID = UUID()
+    let fileID = UUID()
+    let reference = CloudCaseFileReference(
+        id: fileID,
+        caseID: caseID,
+        kind: .photo,
+        fileName: "original-\(fileID.uuidString).jpg",
+        sha256: "abc123",
+        createdAt: Date(timeIntervalSince1970: 200),
+        metadata: Data("{}".utf8)
+    )
+    let storedCase = StoredReportedCase(
+        id: caseID,
+        createdAt: Date(timeIntervalSince1970: 100),
+        incidentAt: Date(timeIntervalSince1970: 50),
+        propertyID: UUID(),
+        propertyName: "Bestandsobjekt",
+        propertyAddress: PostalAddress(),
+        occupancyRole: .tenant,
+        category: .damage,
+        garageLocation: "Stiegenhaus",
+        licensePlate: "",
+        vehicleDescription: "",
+        violation: "Beschädigung",
+        notes: "",
+        witnesses: "",
+        pdfFileName: "Meldung.pdf",
+        cloudFiles: [reference]
+    )
+    let original = AppDataState(
+        reportedCases: [storedCase],
+        deletedCases: [DeletedCaseTombstone(id: UUID(), deletedAt: Date(timeIntervalSince1970: 300))],
+        deletedCloudFileRecordNames: ["alter-record"]
+    )
+
+    let decoded = try JSONDecoder().decode(AppDataState.self, from: JSONEncoder().encode(original))
+
+    #expect(decoded == original)
+    #expect(decoded.reportedCases.first?.cloudFiles?.first?.recordName == reference.recordName)
 }

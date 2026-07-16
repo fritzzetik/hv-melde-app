@@ -371,7 +371,8 @@ private struct NewReportView: View {
                 generatedTechnicalJSONURL: temporaryJSON,
                 evidenceSHA256: evidencePhotos.isEmpty
                     ? nil
-                    : evidencePhotos.map(\.sha256).joined(separator: ", ")
+                    : evidencePhotos.map(\.sha256).joined(separator: ", "),
+                evidencePhotos: evidencePhotos
             )
             if temporaryJSON != nil,
                let storedCase = store.state.reportedCases.first(where: { $0.id == report.id }) {
