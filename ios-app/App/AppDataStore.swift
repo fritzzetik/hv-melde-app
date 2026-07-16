@@ -1,7 +1,6 @@
 import Combine
 import Foundation
 import HVMeldeCore
-import Security
 
 @MainActor
 final class AppDataStore: ObservableObject {
@@ -239,13 +238,6 @@ final class AppDataStore: ObservableObject {
         defer { isCloudSyncInProgress = false }
         iCloudSyncStatus = .syncing
 
-        guard Self.hasCloudKitContainerEntitlement else {
-            iCloudSyncStatus = .unavailable(
-                "Dieser App-Build enthält keine gültige iCloud-Container-Berechtigung. Bitte installiere einen neu signierten Build."
-            )
-            return
-        }
-
         do {
             guard try await cloudSyncService.accountIsAvailable() else {
                 iCloudSyncStatus = .unavailable("Kein aktives iCloud-Konto")
@@ -371,16 +363,4 @@ final class AppDataStore: ObservableObject {
         try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
     }
 
-    private static var hasCloudKitContainerEntitlement: Bool {
-        guard let task = SecTaskCreateFromSelf(nil),
-              let value = SecTaskCopyValueForEntitlement(
-                task,
-                "com.apple.developer.icloud-container-identifiers" as CFString,
-                nil
-              ) else {
-            return false
-        }
-        let identifiers = value as? [String] ?? []
-        return identifiers.contains(CloudKitSyncService.containerIdentifier)
-    }
 }
