@@ -72,7 +72,7 @@ jobs:
           APP_PATH="build/HVMeldeApp.xcarchive/Products/Applications/HV Melde App.app"
           codesign -d --entitlements :- "$APP_PATH" > build/archived-entitlements.plist
           plutil -p build/archived-entitlements.plist
-          CONTAINER=$(plutil -extract com.apple.developer.icloud-container-identifiers.0 raw build/archived-entitlements.plist)
+          CONTAINER=$(/usr/libexec/PlistBuddy -c "Print :com.apple.developer.icloud-container-identifiers:0" build/archived-entitlements.plist)
           if [ "$CONTAINER" != "iCloud.at.zetik.hvmeldeapp" ]; then
             echo "::error::Erwarteter iCloud-Container fehlt im signierten Archiv: $CONTAINER"
             exit 1
