@@ -24,7 +24,7 @@ enum PDFReportRenderer {
         )
         let data = renderer.pdfData { context in
             var pageNumber = 1
-            context.beginPage()
+            beginPage(context, in: pageBounds)
             drawLetter(
                 report,
                 profile: profile,
@@ -39,7 +39,7 @@ enum PDFReportRenderer {
             var attachmentNumber = 1
             for evidencePhoto in evidencePhotos {
                 pageNumber += 1
-                context.beginPage()
+                beginPage(context, in: pageBounds)
                 drawEvidencePhoto(evidencePhoto, attachmentNumber: attachmentNumber, in: pageBounds)
                 drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
                 attachmentNumber += 1
@@ -47,7 +47,7 @@ enum PDFReportRenderer {
 
             if technicalAttachmentMode == .pdf {
                 pageNumber += 1
-                context.beginPage()
+                beginPage(context, in: pageBounds)
                 drawCaseDetails(
                     report,
                     profile: profile,
@@ -61,13 +61,13 @@ enum PDFReportRenderer {
 
                 for evidencePhoto in evidencePhotos {
                     pageNumber += 1
-                    context.beginPage()
+                    beginPage(context, in: pageBounds)
                     drawTechnicalEvidencePhoto(evidencePhoto, attachmentNumber: attachmentNumber, in: pageBounds)
                     drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
                     attachmentNumber += 1
                     if let analysis = evidencePhoto.confirmedAnalysis {
                         pageNumber += 1
-                        context.beginPage()
+                        beginPage(context, in: pageBounds)
                         drawConfirmedAnalysis(analysis, attachmentNumber: attachmentNumber, in: pageBounds)
                         drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
                         attachmentNumber += 1
@@ -96,7 +96,7 @@ enum PDFReportRenderer {
             at: y,
             width: contentWidth,
             font: .boldSystemFont(ofSize: 20),
-            color: .label,
+            color: textColor,
             margin: margin
         ) + 18
 
@@ -120,7 +120,7 @@ enum PDFReportRenderer {
                 at: y,
                 width: contentWidth,
                 font: .systemFont(ofSize: 10.5),
-                color: .secondaryLabel,
+                color: secondaryTextColor,
                 margin: margin
             ) + 10
         }
@@ -132,7 +132,7 @@ enum PDFReportRenderer {
                 at: y,
                 width: contentWidth,
                 font: .systemFont(ofSize: 11),
-                color: .label,
+                color: textColor,
                 margin: margin
             )
         }
@@ -152,7 +152,7 @@ enum PDFReportRenderer {
             at: y,
             width: contentWidth,
             font: .boldSystemFont(ofSize: 20),
-            color: .label,
+            color: textColor,
             margin: margin
         ) + 14
 
@@ -193,13 +193,13 @@ enum PDFReportRenderer {
         ]
 
         for (label, value) in rows {
-            y = drawText(label.uppercased(), at: y, width: contentWidth, font: .boldSystemFont(ofSize: 8), color: .secondaryLabel, margin: margin) + 2
+            y = drawText(label.uppercased(), at: y, width: contentWidth, font: .boldSystemFont(ofSize: 8), color: secondaryTextColor, margin: margin) + 2
             y = drawText(
                 value,
                 at: y,
                 width: contentWidth,
                 font: label.contains("SHA-256") ? .monospacedSystemFont(ofSize: 9, weight: .regular) : .systemFont(ofSize: 10),
-                color: .label,
+                color: textColor,
                 margin: margin
             ) + 7
         }
@@ -219,7 +219,7 @@ enum PDFReportRenderer {
             at: y,
             width: contentWidth,
             font: .boldSystemFont(ofSize: 20),
-            color: .label,
+            color: textColor,
             margin: margin
         ) + 18
 
@@ -265,7 +265,7 @@ enum PDFReportRenderer {
                 at: y,
                 width: contentWidth,
                 font: .boldSystemFont(ofSize: 9),
-                color: .secondaryLabel,
+                color: secondaryTextColor,
                 margin: margin
             ) + 3
             y = drawText(
@@ -273,7 +273,7 @@ enum PDFReportRenderer {
                 at: y,
                 width: contentWidth,
                 font: .systemFont(ofSize: 12),
-                color: .label,
+                color: textColor,
                 margin: margin
             ) + 13
         }
@@ -283,7 +283,7 @@ enum PDFReportRenderer {
             at: y + 18,
             width: contentWidth,
             font: .systemFont(ofSize: 9),
-            color: .secondaryLabel,
+            color: secondaryTextColor,
             margin: margin
         )
     }
@@ -314,7 +314,7 @@ enum PDFReportRenderer {
             at: y,
             width: contentWidth - 150,
             font: .systemFont(ofSize: 7.5),
-            color: .secondaryLabel,
+            color: secondaryTextColor,
             margin: margin
         )
         drawRightAlignedText(
@@ -343,7 +343,7 @@ enum PDFReportRenderer {
             at: y,
             width: 290,
             font: .systemFont(ofSize: 10.5),
-            color: .label,
+            color: textColor,
             margin: margin
         )
 
@@ -351,7 +351,7 @@ enum PDFReportRenderer {
             letterDateFormatter.string(from: report.createdAt),
             at: max(154, y + 12),
             font: .systemFont(ofSize: 10.5),
-            color: .label,
+            color: textColor,
             rightMargin: margin,
             in: bounds
         )
@@ -362,7 +362,7 @@ enum PDFReportRenderer {
             at: y,
             width: contentWidth,
             font: .boldSystemFont(ofSize: 15),
-            color: .label,
+            color: textColor,
             margin: margin
         ) + 23
 
@@ -371,7 +371,7 @@ enum PDFReportRenderer {
             at: y,
             width: contentWidth,
             font: .systemFont(ofSize: 11.5),
-            color: .label,
+            color: textColor,
             margin: margin
         ) + 15
 
@@ -388,7 +388,7 @@ enum PDFReportRenderer {
             at: y,
             width: contentWidth,
             font: .systemFont(ofSize: 11.5),
-            color: .label,
+            color: textColor,
             margin: margin
         ) + 16
 
@@ -405,14 +405,14 @@ enum PDFReportRenderer {
         }
         let boxHeight = CGFloat(factLines.count) * 15 + 20
         let boxRect = CGRect(x: margin, y: y, width: contentWidth, height: boxHeight)
-        UIColor.secondarySystemBackground.setFill()
+        panelBackgroundColor.setFill()
         UIBezierPath(roundedRect: boxRect, cornerRadius: 8).fill()
         _ = drawText(
             factLines.joined(separator: "\n"),
             at: y + 10,
             width: contentWidth - 24,
             font: .systemFont(ofSize: 10.5),
-            color: .label,
+            color: textColor,
             margin: margin + 12
         )
         y = boxRect.maxY + 17
@@ -424,7 +424,7 @@ enum PDFReportRenderer {
                 at: y,
                 width: contentWidth,
                 font: .boldSystemFont(ofSize: 9),
-                color: .secondaryLabel,
+                color: secondaryTextColor,
                 margin: margin
             ) + 4
             y = drawText(
@@ -432,7 +432,7 @@ enum PDFReportRenderer {
                 at: y,
                 width: contentWidth,
                 font: .systemFont(ofSize: 11),
-                color: .label,
+                color: textColor,
                 margin: margin
             ) + 15
         }
@@ -448,7 +448,7 @@ enum PDFReportRenderer {
             at: y,
             width: contentWidth,
             font: .boldSystemFont(ofSize: 9),
-            color: .secondaryLabel,
+            color: secondaryTextColor,
             margin: margin
         ) + 4
         y = drawText(
@@ -456,7 +456,7 @@ enum PDFReportRenderer {
             at: y,
             width: contentWidth,
             font: .systemFont(ofSize: 11),
-            color: .label,
+            color: textColor,
             margin: margin
         ) + 15
 
@@ -469,7 +469,7 @@ enum PDFReportRenderer {
                 at: y,
                 width: contentWidth,
                 font: .systemFont(ofSize: 11),
-                color: .label,
+                color: textColor,
                 margin: margin
             ) + 18
         }
@@ -479,7 +479,7 @@ enum PDFReportRenderer {
             at: y,
             width: contentWidth,
             font: .systemFont(ofSize: 11),
-            color: .label,
+            color: textColor,
             margin: margin
         ) + 18
 
@@ -489,7 +489,7 @@ enum PDFReportRenderer {
                 at: y,
                 width: contentWidth,
                 font: .systemFont(ofSize: 9.5),
-                color: .secondaryLabel,
+                color: secondaryTextColor,
                 margin: margin
             )
         }
@@ -537,7 +537,7 @@ enum PDFReportRenderer {
             at: y,
             width: contentWidth,
             font: .boldSystemFont(ofSize: 20),
-            color: .label,
+            color: textColor,
             margin: margin
         ) + 9
 
@@ -546,7 +546,7 @@ enum PDFReportRenderer {
             at: y,
             width: contentWidth,
             font: .systemFont(ofSize: 9),
-            color: .secondaryLabel,
+            color: secondaryTextColor,
             margin: margin
         ) + 16
 
@@ -581,7 +581,7 @@ enum PDFReportRenderer {
                 at: y,
                 width: contentWidth,
                 font: .boldSystemFont(ofSize: 8),
-                color: .secondaryLabel,
+                color: secondaryTextColor,
                 margin: margin
             ) + 2
             y = drawText(
@@ -589,7 +589,7 @@ enum PDFReportRenderer {
                 at: y,
                 width: contentWidth,
                 font: .systemFont(ofSize: 10.5),
-                color: .label,
+                color: textColor,
                 margin: margin
             ) + 5
         }
@@ -630,13 +630,13 @@ enum PDFReportRenderer {
     ) {
         let margin: CGFloat = 48
         let width = bounds.width - (2 * margin)
-        drawLine(at: 786, margin: margin, width: width, color: .systemGray4)
+        drawLine(at: 786, margin: margin, width: width, color: separatorColor)
         _ = drawText(
             "Lokal erstellt. Kein externer oder qualifizierter Zeitstempel.",
             at: 794,
             width: width - 120,
             font: .systemFont(ofSize: 7),
-            color: .secondaryLabel,
+            color: secondaryTextColor,
             margin: margin
         )
         _ = drawText(
@@ -644,14 +644,14 @@ enum PDFReportRenderer {
             at: 808,
             width: width - 90,
             font: .monospacedSystemFont(ofSize: 6.5, weight: .regular),
-            color: .secondaryLabel,
+            color: secondaryTextColor,
             margin: margin
         )
         drawRightAlignedText(
             "Seite \(page) von \(totalPages)",
             at: 808,
             font: .systemFont(ofSize: 7),
-            color: .secondaryLabel,
+            color: secondaryTextColor,
             rightMargin: margin,
             in: bounds
         )
@@ -669,6 +669,12 @@ enum PDFReportRenderer {
         path.move(to: CGPoint(x: margin, y: y))
         path.addLine(to: CGPoint(x: margin + width, y: y))
         path.stroke()
+    }
+
+    private static func beginPage(_ context: UIGraphicsPDFRendererContext, in bounds: CGRect) {
+        context.beginPage()
+        pageBackgroundColor.setFill()
+        UIRectFill(bounds)
     }
 
     private static func drawRightAlignedText(
@@ -716,6 +722,13 @@ enum PDFReportRenderer {
         return String(cleaned[..<end]) + "…"
     }
 
+    // PDF output must not use semantic UIKit colors. On iOS 27 beta these
+    // can resolve with a dark appearance even though the PDF page is white.
+    private static let pageBackgroundColor = UIColor.white
+    private static let textColor = UIColor(red: 0.08, green: 0.09, blue: 0.11, alpha: 1)
+    private static let secondaryTextColor = UIColor(red: 0.36, green: 0.38, blue: 0.42, alpha: 1)
+    private static let panelBackgroundColor = UIColor(red: 0.95, green: 0.96, blue: 0.97, alpha: 1)
+    private static let separatorColor = UIColor(red: 0.72, green: 0.74, blue: 0.77, alpha: 1)
     private static let accentColor = UIColor(red: 0.08, green: 0.31, blue: 0.52, alpha: 1)
 
     private static let dateFormatter: DateFormatter = {
