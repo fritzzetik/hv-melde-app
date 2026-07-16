@@ -69,11 +69,11 @@ final class CloudKitSyncService {
             return CloudSyncResult(state: localState, synchronizedAt: saved.modificationDate ?? Date())
         }
 
-        guard let payload = existingRecord["payload"] as? Data else {
+        guard let payload = existingRecord.encryptedValues["payload"] as? Data else {
             throw CloudSyncError.invalidCloudData
         }
         let remoteState = try decoder.decode(AppDataState.self, from: payload)
-        let remoteModifiedAt = existingRecord["stateModifiedAt"] as? Date
+        let remoteModifiedAt = existingRecord.encryptedValues["stateModifiedAt"] as? Date
             ?? existingRecord.modificationDate
             ?? .distantPast
 
@@ -110,9 +110,9 @@ final class CloudKitSyncService {
         on record: CKRecord,
         encoder: JSONEncoder
     ) throws {
-        record["payload"] = try encoder.encode(state) as CKRecordValue
-        record["stateModifiedAt"] = modifiedAt as CKRecordValue
-        record["schemaVersion"] = NSNumber(value: 1)
+        record.encryptedValues["payload"] = try encoder.encode(state) as CKRecordValue
+        record.encryptedValues["stateModifiedAt"] = modifiedAt as CKRecordValue
+        record.encryptedValues["schemaVersion"] = NSNumber(value: 1)
     }
 
     private func hasLocalContent(_ state: AppDataState) -> Bool {
