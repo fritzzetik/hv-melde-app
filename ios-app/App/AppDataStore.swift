@@ -11,7 +11,9 @@ final class AppDataStore: ObservableObject {
     @Published private(set) var iCloudSyncStatus: ICloudSyncStatus
 
     private let fileURL: URL
-    private let cloudSyncService = CloudKitSyncService()
+    // CloudKit must not be initialized during app launch. This also keeps the app
+    // usable when iCloud is disabled or the distribution profile is temporarily stale.
+    private lazy var cloudSyncService = CloudKitSyncService()
     private var cloudSyncTask: Task<Void, Never>?
     private var stateModifiedAt: Date
     private var lastCloudSyncAt: Date?

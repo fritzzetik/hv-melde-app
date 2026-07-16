@@ -32,15 +32,16 @@ struct CloudSyncResult: Sendable {
 
 @MainActor
 final class CloudKitSyncService {
-    static let containerIdentifier = "iCloud.at.zetik.hvmeldeapp"
-
     private let container: CKContainer
     private let database: CKDatabase
     private let recordID = CKRecord.ID(recordName: "primary-app-data")
     private let recordType = "AppDataSnapshot"
 
     init() {
-        container = CKContainer(identifier: Self.containerIdentifier)
+        // The default container is resolved from the signed app entitlements. Creating
+        // a container from a hard-coded identifier traps before errors can be handled
+        // when a distribution profile doesn't expose that identifier exactly.
+        container = CKContainer.default()
         database = container.privateCloudDatabase
     }
 
