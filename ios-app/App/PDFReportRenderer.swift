@@ -437,6 +437,29 @@ enum PDFReportRenderer {
             ) + 15
         }
 
+        let responseSentence = report.wantsManagementResponse
+            ? "Ich ersuche um eine kurze Rückmeldung zum Ergebnis der Prüfung beziehungsweise zum weiteren Vorgehen."
+            : "Eine gesonderte Rückmeldung der Hausverwaltung ist nicht erforderlich."
+        let disclosureSentence = report.permitsNameDisclosure
+            ? "Mein Name darf der verursachenden Person mitgeteilt werden."
+            : "Ich ersuche darum, meinen Namen gegenüber der verursachenden Person nicht offenzulegen."
+        y = drawText(
+            "Rückmeldung und Vertraulichkeit",
+            at: y,
+            width: contentWidth,
+            font: .boldSystemFont(ofSize: 9),
+            color: .secondaryLabel,
+            margin: margin
+        ) + 4
+        y = drawText(
+            "\(responseSentence) \(disclosureSentence)",
+            at: y,
+            width: contentWidth,
+            font: .systemFont(ofSize: 11),
+            color: .label,
+            margin: margin
+        ) + 15
+
         if !attachmentTitles.isEmpty {
             let attachmentSentence = technicalAttachmentMode == .json
                 ? "Die Beweisfotos finden Sie im PDF. Technische Daten sind zusätzlich als maschinenlesbare JSON-Datei beigefügt."
@@ -547,7 +570,9 @@ enum PDFReportRenderer {
             ("Fahrzeug", report.vehicleDescription),
             ("Verstoß", report.violation),
             ("Beschreibung", report.notes),
-            ("Zeugen", report.witnesses)
+            ("Zeugen", report.witnesses),
+            ("Rückmeldung der Hausverwaltung", report.wantsManagementResponse ? "Erwünscht" : "Nicht erforderlich"),
+            ("Weitergabe des Namens", report.permitsNameDisclosure ? "Erlaubt" : "Nicht erlaubt")
         ]
 
         for (label, value) in rows where !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

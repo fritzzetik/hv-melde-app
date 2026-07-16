@@ -251,7 +251,9 @@ final class AppDataStore: ObservableObject {
                 isCommonArea: report.isCommonArea,
                 officialPropertyName: property.officialName,
                 propertyType: property.propertyType,
-                cloudFiles: cloudFiles
+                cloudFiles: cloudFiles,
+                requestsManagementResponse: report.wantsManagementResponse,
+                allowsNameDisclosure: report.permitsNameDisclosure
             )
             if let index = state.reportedCases.firstIndex(where: { $0.id == report.id }) {
                 state.reportedCases[index] = storedCase

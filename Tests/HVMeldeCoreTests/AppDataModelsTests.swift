@@ -83,7 +83,9 @@ func appDataRoundTrip() throws {
                 pdfFileName: "Meldung.pdf",
                 isCommonArea: true,
                 officialPropertyName: "Wohnanlage Musterhof",
-                propertyType: .apartment
+                propertyType: .apartment,
+                requestsManagementResponse: false,
+                allowsNameDisclosure: true
             )
         ],
         preferences: AppPreferences(
@@ -119,6 +121,8 @@ func oldCaseWithoutAreaScopeDefaultsToOwnObject() throws {
     let encoded = try JSONEncoder().encode(storedCase)
     var json = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
     json.removeValue(forKey: "isCommonArea")
+    json.removeValue(forKey: "requestsManagementResponse")
+    json.removeValue(forKey: "allowsNameDisclosure")
 
     let legacyData = try JSONSerialization.data(withJSONObject: json)
     let decoded = try JSONDecoder().decode(StoredReportedCase.self, from: legacyData)
@@ -128,6 +132,8 @@ func oldCaseWithoutAreaScopeDefaultsToOwnObject() throws {
     #expect(decoded.resolvedPropertyType == .apartment)
     #expect(decoded.technicalJSONFileName == nil)
     #expect(decoded.cloudFiles == nil)
+    #expect(decoded.wantsManagementResponse)
+    #expect(!decoded.permitsNameDisclosure)
 }
 
 @Test("Bestehende lokale Daten ohne Rolle und Fallliste bleiben lesbar")
@@ -191,6 +197,29 @@ func customReportCategoryRoundTrip() throws {
 
     #expect(decoded == original)
     #expect(!decoded.isBuiltIn)
+}
+
+@Test("Alte Meldung erhält datenschutzfreundliche Bearbeitungswünsche")
+func oldIncidentReportDefaultsResponseAndDisclosure() throws {
+    let report = IncidentReport(
+        incidentAt: Date(timeIntervalSince1970: 100),
+        propertyName: "Wohnanlage",
+        garageLocation: "Eingang",
+        licensePlate: "",
+        violation: "Beleuchtung ausgefallen",
+        category: .lighting
+    )
+    var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(report)) as? [String: Any])
+    json.removeValue(forKey: "requestsManagementResponse")
+    json.removeValue(forKey: "allowsNameDisclosure")
+
+    let decoded = try JSONDecoder().decode(
+        IncidentReport.self,
+        from: JSONSerialization.data(withJSONObject: json)
+    )
+
+    #expect(decoded.wantsManagementResponse)
+    #expect(!decoded.permitsNameDisclosure)
 }
 
 @Test("Cloud-Dateiliste bleibt im verschlüsselten App-Snapshot erhalten")

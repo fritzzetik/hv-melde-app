@@ -13,6 +13,8 @@ public struct IncidentReport: Codable, Equatable, Identifiable, Sendable {
     public var witnesses: String
     public var isCommonArea: Bool
     public var category: ReportCategory
+    public var requestsManagementResponse: Bool?
+    public var allowsNameDisclosure: Bool?
 
     public init(
         id: UUID = UUID(),
@@ -26,7 +28,9 @@ public struct IncidentReport: Codable, Equatable, Identifiable, Sendable {
         notes: String = "",
         witnesses: String = "",
         isCommonArea: Bool = false,
-        category: ReportCategory = .unauthorizedVehicle
+        category: ReportCategory = .unauthorizedVehicle,
+        requestsManagementResponse: Bool = true,
+        allowsNameDisclosure: Bool = false
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -40,5 +44,10 @@ public struct IncidentReport: Codable, Equatable, Identifiable, Sendable {
         self.witnesses = witnesses
         self.isCommonArea = isCommonArea
         self.category = category
+        self.requestsManagementResponse = requestsManagementResponse
+        self.allowsNameDisclosure = allowsNameDisclosure
     }
+
+    public var wantsManagementResponse: Bool { requestsManagementResponse ?? true }
+    public var permitsNameDisclosure: Bool { allowsNameDisclosure ?? false }
 }

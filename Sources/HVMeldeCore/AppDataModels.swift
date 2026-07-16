@@ -261,6 +261,8 @@ public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
     public let officialPropertyName: String?
     public let propertyType: PropertyType?
     public var cloudFiles: [CloudCaseFileReference]?
+    public let requestsManagementResponse: Bool?
+    public let allowsNameDisclosure: Bool?
 
     public init(
         id: UUID,
@@ -286,7 +288,9 @@ public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
         isCommonArea: Bool = false,
         officialPropertyName: String? = nil,
         propertyType: PropertyType? = nil,
-        cloudFiles: [CloudCaseFileReference]? = nil
+        cloudFiles: [CloudCaseFileReference]? = nil,
+        requestsManagementResponse: Bool = true,
+        allowsNameDisclosure: Bool = false
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -312,6 +316,8 @@ public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
         self.officialPropertyName = officialPropertyName
         self.propertyType = propertyType
         self.cloudFiles = cloudFiles
+        self.requestsManagementResponse = requestsManagementResponse
+        self.allowsNameDisclosure = allowsNameDisclosure
     }
 
     public var concernsCommonArea: Bool { isCommonArea ?? false }
@@ -322,6 +328,8 @@ public struct StoredReportedCase: Codable, Equatable, Identifiable, Sendable {
     }
 
     public var resolvedPropertyType: PropertyType { propertyType ?? .apartment }
+    public var wantsManagementResponse: Bool { requestsManagementResponse ?? true }
+    public var permitsNameDisclosure: Bool { allowsNameDisclosure ?? false }
 }
 
 public struct AppDataState: Codable, Equatable, Sendable {

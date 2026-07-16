@@ -80,6 +80,8 @@ private struct NewReportView: View {
     @State private var violation = "Dauerparken"
     @State private var notes = ""
     @State private var witnesses = ""
+    @State private var requestsManagementResponse = true
+    @State private var allowsNameDisclosure = false
     @State private var evidencePhotos: [EvidencePhoto] = []
     @State private var generatedPDF: URL?
     @State private var generatedTechnicalJSON: URL?
@@ -268,6 +270,13 @@ private struct NewReportView: View {
                 .lineLimit(3...8)
             TextField("Zeugen (optional)", text: $witnesses)
         }
+        Section("Rückmeldung und Vertraulichkeit") {
+            Toggle("Rückmeldung der Hausverwaltung erwünscht", isOn: $requestsManagementResponse)
+            Toggle("Mein Name darf dem Verursacher mitgeteilt werden", isOn: $allowsNameDisclosure)
+            Text("Die Auswahl wird deutlich im Schreiben an die Hausverwaltung angeführt.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     @ViewBuilder
@@ -278,6 +287,8 @@ private struct NewReportView: View {
             LabeledContent("Bereich", value: garageLocation)
             LabeledContent("Meldegrund", value: violation)
             LabeledContent("Beweisfotos", value: "\(evidencePhotos.count)")
+            LabeledContent("Rückmeldung erwünscht", value: requestsManagementResponse ? "Ja" : "Nein")
+            LabeledContent("Namensweitergabe erlaubt", value: allowsNameDisclosure ? "Ja" : "Nein")
         }
         Section {
             Button("PDF erzeugen", action: generatePDF)
@@ -359,7 +370,9 @@ private struct NewReportView: View {
             notes: notes,
             witnesses: witnesses,
             isCommonArea: isCommonArea,
-            category: category
+            category: category,
+            requestsManagementResponse: requestsManagementResponse,
+            allowsNameDisclosure: allowsNameDisclosure
         )
 
         do {
@@ -421,6 +434,8 @@ private struct NewReportView: View {
         violation = category.defaultViolation
         notes = ""
         witnesses = ""
+        requestsManagementResponse = true
+        allowsNameDisclosure = false
         evidencePhotos = []
         generatedPDF = nil
         generatedTechnicalJSON = nil
@@ -461,7 +476,9 @@ private struct NewReportView: View {
             violation: violation,
             notes: notes,
             witnesses: witnesses,
-            evidencePhotoCount: evidencePhotos.count
+            evidencePhotoCount: evidencePhotos.count,
+            requestsManagementResponse: requestsManagementResponse,
+            allowsNameDisclosure: allowsNameDisclosure
         )
     }
 
@@ -484,6 +501,8 @@ private struct NewReportView: View {
             violation = draft.violation
             notes = draft.notes
             witnesses = draft.witnesses
+            requestsManagementResponse = draft.wantsManagementResponse
+            allowsNameDisclosure = draft.permitsNameDisclosure
             Task {
                 if let restoredPhotos = try? await EvidencePhotoStore.loadAll(for: draft.reportID) {
                     await MainActor.run { evidencePhotos = restoredPhotos }

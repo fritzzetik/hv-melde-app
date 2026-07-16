@@ -10,7 +10,7 @@ enum TechnicalReportExporter {
         evidencePhotos: [EvidencePhoto]
     ) throws -> URL {
         let document = TechnicalReportDocument(
-            schemaVersion: 1,
+            schemaVersion: 2,
             exportedAt: Date(),
             report: report,
             profile: profile,

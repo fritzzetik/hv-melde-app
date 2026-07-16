@@ -207,6 +207,17 @@ private struct ReportedCaseDetailView: View {
                         }
                     }
 
+                    Section("Rückmeldung und Vertraulichkeit") {
+                        LabeledContent(
+                            "Rückmeldung der Hausverwaltung",
+                            value: reportedCase.wantsManagementResponse ? "Erwünscht" : "Nicht erforderlich"
+                        )
+                        LabeledContent(
+                            "Weitergabe des Namens",
+                            value: reportedCase.permitsNameDisclosure ? "Erlaubt" : "Nicht erlaubt"
+                        )
+                    }
+
                     if let pdfURL = store.pdfURL(for: reportedCase) {
                         Section("PDF") {
                             Button {

@@ -130,7 +130,7 @@ final class CloudKitSyncService {
     ) throws {
         record.encryptedValues["payload"] = try encoder.encode(state) as CKRecordValue
         record.encryptedValues["stateModifiedAt"] = modifiedAt as CKRecordValue
-        record.encryptedValues["schemaVersion"] = NSNumber(value: 3)
+        record.encryptedValues["schemaVersion"] = NSNumber(value: 4)
     }
 
     private func hasLocalContent(_ state: AppDataState) -> Bool {

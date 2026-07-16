@@ -15,6 +15,11 @@ struct IncidentDraft: Codable, Equatable, Sendable {
     var notes: String
     var witnesses: String
     var evidencePhotoCount: Int
+    var requestsManagementResponse: Bool?
+    var allowsNameDisclosure: Bool?
+
+    var wantsManagementResponse: Bool { requestsManagementResponse ?? true }
+    var permitsNameDisclosure: Bool { allowsNameDisclosure ?? false }
 
     var hasMeaningfulContent: Bool {
         !garageLocation.trimmed.isEmpty
@@ -25,6 +30,8 @@ struct IncidentDraft: Codable, Equatable, Sendable {
             || !notes.trimmed.isEmpty
             || !witnesses.trimmed.isEmpty
             || evidencePhotoCount > 0
+            || !wantsManagementResponse
+            || permitsNameDisclosure
     }
 }
 
