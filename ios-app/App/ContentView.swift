@@ -196,12 +196,20 @@ private struct NewReportView: View {
         return store.state.properties.first { $0.id == selectedPropertyID }
     }
 
+    private var selectableCategories: [ReportCategory] {
+        var categories = store.activeReportCategories
+        if !categories.contains(where: { $0.id == category.id }) {
+            categories.append(category)
+        }
+        return categories
+    }
+
     @ViewBuilder
     private var objectStep: some View {
         Section("Meldekategorie") {
-            Picker("Kategorie", selection: $category) {
-                ForEach(ReportCategory.allCases) { category in
-                    Text(category.rawValue).tag(category)
+            Picker("Kategorie", selection: selectedCategoryID) {
+                ForEach(selectableCategories) { category in
+                    Text(category.rawValue).tag(category.id)
                 }
             }
         }
@@ -231,6 +239,16 @@ private struct NewReportView: View {
                 }
             }
         }
+    }
+
+    private var selectedCategoryID: Binding<String> {
+        Binding(
+            get: { category.id },
+            set: { id in
+                guard let selected = selectableCategories.first(where: { $0.id == id }) else { return }
+                category = selected
+            }
+        )
     }
 
     @ViewBuilder
@@ -394,13 +412,13 @@ private struct NewReportView: View {
     private func resetReport() {
         reportID = UUID()
         reportCreatedAt = Date()
-        category = .unauthorizedVehicle
+        category = store.activeReportCategories.first ?? .unauthorizedVehicle
         incidentAt = Date()
         garageLocation = ""
         isCommonArea = false
         licensePlate = ""
         vehicleDescription = ""
-        violation = ReportCategory.unauthorizedVehicle.defaultViolation
+        violation = category.defaultViolation
         notes = ""
         witnesses = ""
         evidencePhotos = []
@@ -471,6 +489,10 @@ private struct NewReportView: View {
                     await MainActor.run { evidencePhotos = restoredPhotos }
                 }
             }
+        } else if let preferredCategory = store.activeReportCategories.first {
+            suppressNextCategoryReset = true
+            category = preferredCategory
+            violation = preferredCategory.defaultViolation
         }
         selectFirstPropertyIfNeeded()
         didRestoreDraft = true

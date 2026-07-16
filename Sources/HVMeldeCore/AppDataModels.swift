@@ -329,6 +329,7 @@ public struct AppDataState: Codable, Equatable, Sendable {
     public var properties: [ManagedProperty]
     public var propertyManagements: [PropertyManagement]
     public var reportedCases: [StoredReportedCase]
+    public var reportCategories: [ReportCategory]
     public var preferences: AppPreferences
     public var deletedCases: [DeletedCaseTombstone]
     public var deletedCloudFileRecordNames: [String]
@@ -338,6 +339,7 @@ public struct AppDataState: Codable, Equatable, Sendable {
         properties: [ManagedProperty] = [],
         propertyManagements: [PropertyManagement] = [],
         reportedCases: [StoredReportedCase] = [],
+        reportCategories: [ReportCategory] = ReportCategory.defaultCategories,
         preferences: AppPreferences = AppPreferences(),
         deletedCases: [DeletedCaseTombstone] = [],
         deletedCloudFileRecordNames: [String] = []
@@ -346,13 +348,14 @@ public struct AppDataState: Codable, Equatable, Sendable {
         self.properties = properties
         self.propertyManagements = propertyManagements
         self.reportedCases = reportedCases
+        self.reportCategories = reportCategories
         self.preferences = preferences
         self.deletedCases = deletedCases
         self.deletedCloudFileRecordNames = deletedCloudFileRecordNames
     }
 
     private enum CodingKeys: String, CodingKey {
-        case profile, properties, propertyManagements, reportedCases, preferences
+        case profile, properties, propertyManagements, reportedCases, reportCategories, preferences
         case deletedCases, deletedCloudFileRecordNames
     }
 
@@ -362,6 +365,8 @@ public struct AppDataState: Codable, Equatable, Sendable {
         properties = try container.decodeIfPresent([ManagedProperty].self, forKey: .properties) ?? []
         propertyManagements = try container.decodeIfPresent([PropertyManagement].self, forKey: .propertyManagements) ?? []
         reportedCases = try container.decodeIfPresent([StoredReportedCase].self, forKey: .reportedCases) ?? []
+        reportCategories = try container.decodeIfPresent([ReportCategory].self, forKey: .reportCategories)
+            ?? ReportCategory.defaultCategories
         preferences = try container.decodeIfPresent(AppPreferences.self, forKey: .preferences) ?? AppPreferences()
         deletedCases = try container.decodeIfPresent([DeletedCaseTombstone].self, forKey: .deletedCases) ?? []
         deletedCloudFileRecordNames = try container.decodeIfPresent([String].self, forKey: .deletedCloudFileRecordNames) ?? []

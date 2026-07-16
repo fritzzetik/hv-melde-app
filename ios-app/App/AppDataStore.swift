@@ -58,6 +58,66 @@ final class AppDataStore: ObservableObject {
         persist()
     }
 
+    var activeReportCategories: [ReportCategory] {
+        state.reportCategories
+            .filter { $0.isEnabled && !$0.isDeleted }
+            .sorted(by: Self.categorySort)
+    }
+
+    var configurableReportCategories: [ReportCategory] {
+        state.reportCategories
+            .filter { !$0.isDeleted }
+            .sorted(by: Self.categorySort)
+    }
+
+    func upsertReportCategory(_ category: ReportCategory) {
+        var category = category
+        category.name = category.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        category.defaultViolation = category.defaultViolation.trimmingCharacters(in: .whitespacesAndNewlines)
+        if category.defaultViolation.isEmpty { category.defaultViolation = category.name }
+        category.updatedAt = Date()
+        if let index = state.reportCategories.firstIndex(where: { $0.id == category.id }) {
+            state.reportCategories[index] = category
+        } else {
+            category.sortOrder = (state.reportCategories.map(\.sortOrder).max() ?? -1) + 1
+            state.reportCategories.append(category)
+        }
+        persist()
+    }
+
+    func setReportCategoryEnabled(_ isEnabled: Bool, id: String) {
+        guard let index = state.reportCategories.firstIndex(where: { $0.id == id }) else { return }
+        if !isEnabled && activeReportCategories.count <= 1 { return }
+        state.reportCategories[index].isEnabled = isEnabled
+        state.reportCategories[index].updatedAt = Date()
+        persist()
+    }
+
+    func deleteReportCategory(_ id: String) {
+        guard let index = state.reportCategories.firstIndex(where: { $0.id == id }),
+              !state.reportCategories[index].isBuiltIn else { return }
+        state.reportCategories[index].isDeleted = true
+        state.reportCategories[index].isEnabled = false
+        state.reportCategories[index].updatedAt = Date()
+        persist()
+    }
+
+    func moveReportCategories(from source: IndexSet, to destination: Int) {
+        var categories = configurableReportCategories
+        let moving = source.sorted().map { categories[$0] }
+        for index in source.sorted(by: >) { categories.remove(at: index) }
+        let removedBeforeDestination = source.filter { $0 < destination }.count
+        let insertionIndex = min(max(destination - removedBeforeDestination, 0), categories.count)
+        categories.insert(contentsOf: moving, at: insertionIndex)
+        let now = Date()
+        for (order, category) in categories.enumerated() {
+            guard let index = state.reportCategories.firstIndex(where: { $0.id == category.id }) else { continue }
+            state.reportCategories[index].sortOrder = order
+            state.reportCategories[index].updatedAt = now
+        }
+        persist()
+    }
+
     func upsert(_ property: ManagedProperty) {
         if let index = state.properties.firstIndex(where: { $0.id == property.id }) {
             state.properties[index] = property
@@ -475,6 +535,13 @@ final class AppDataStore: ObservableObject {
 
     private static func sha256(_ data: Data) -> String {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func categorySort(_ lhs: ReportCategory, _ rhs: ReportCategory) -> Bool {
+        if lhs.sortOrder == rhs.sortOrder {
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+        return lhs.sortOrder < rhs.sortOrder
     }
 
 }

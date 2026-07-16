@@ -138,6 +138,7 @@ func oldAppDataMigratesWithDefaults() throws {
     let encoded = try JSONEncoder().encode(oldState)
     var json = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
     json.removeValue(forKey: "reportedCases")
+    json.removeValue(forKey: "reportCategories")
     json.removeValue(forKey: "preferences")
     var properties = try #require(json["properties"] as? [[String: Any]])
     properties[0].removeValue(forKey: "occupancyRole")
@@ -159,10 +160,37 @@ func oldAppDataMigratesWithDefaults() throws {
     #expect(decoded.properties.first?.address.houseNumber == "")
     #expect(decoded.properties.first?.address.unit == "")
     #expect(decoded.reportedCases.isEmpty)
+    #expect(decoded.reportCategories == ReportCategory.defaultCategories)
     #expect(!decoded.preferences.enhancedLocalAnalysisEnabled)
     #expect(decoded.preferences.technicalAttachmentMode == .none)
     #expect(decoded.deletedCases.isEmpty)
     #expect(decoded.deletedCloudFileRecordNames.isEmpty)
+}
+
+@Test("Alte als Text gespeicherte Meldekategorie bleibt lesbar")
+func legacyReportCategoryMigrates() throws {
+    let legacyData = try #require("\"Beschädigung\"".data(using: .utf8))
+
+    let decoded = try JSONDecoder().decode(ReportCategory.self, from: legacyData)
+
+    #expect(decoded == .damage)
+    #expect(!decoded.expectsVehicle)
+}
+
+@Test("Eigene Meldekategorie behält Eingaberegeln")
+func customReportCategoryRoundTrip() throws {
+    let original = ReportCategory(
+        name: "Falsch abgestelltes Fahrrad",
+        defaultViolation: "Fahrrad blockiert den Fluchtweg",
+        expectsVehicle: false,
+        sortOrder: 20,
+        updatedAt: Date(timeIntervalSince1970: 500)
+    )
+
+    let decoded = try JSONDecoder().decode(ReportCategory.self, from: JSONEncoder().encode(original))
+
+    #expect(decoded == original)
+    #expect(!decoded.isBuiltIn)
 }
 
 @Test("Cloud-Dateiliste bleibt im verschlüsselten App-Snapshot erhalten")

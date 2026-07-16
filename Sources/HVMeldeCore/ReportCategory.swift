@@ -1,27 +1,118 @@
 import Foundation
 
-public enum ReportCategory: String, CaseIterable, Codable, Identifiable, Sendable {
-    case unauthorizedVehicle = "Unberechtigt abgestelltes Fahrzeug"
-    case blockedAccess = "Zufahrt oder Durchgang blockiert"
-    case outsideParkingSpace = "Fahrzeug außerhalb des Stellplatzes"
-    case bulkyWaste = "Sperrmüll oder unerlaubte Ablagerung"
-    case contamination = "Verschmutzung"
-    case damage = "Beschädigung"
-    case other = "Sonstiges"
+public struct ReportCategory: Codable, Equatable, Hashable, Identifiable, Sendable {
+    public let id: String
+    public var name: String
+    public var defaultViolation: String
+    public var expectsVehicle: Bool
+    public var isEnabled: Bool
+    public var isDeleted: Bool
+    public var sortOrder: Int
+    public var updatedAt: Date
 
-    public var id: String { rawValue }
-
-    public var defaultViolation: String {
-        rawValue
+    public init(
+        id: String = "custom.\(UUID().uuidString.lowercased())",
+        name: String,
+        defaultViolation: String = "",
+        expectsVehicle: Bool = false,
+        isEnabled: Bool = true,
+        isDeleted: Bool = false,
+        sortOrder: Int = 0,
+        updatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.name = name
+        self.defaultViolation = defaultViolation.isEmpty ? name : defaultViolation
+        self.expectsVehicle = expectsVehicle
+        self.isEnabled = isEnabled
+        self.isDeleted = isDeleted
+        self.sortOrder = sortOrder
+        self.updatedAt = updatedAt
     }
 
-    public var expectsVehicle: Bool {
-        switch self {
-        case .unauthorizedVehicle, .blockedAccess, .outsideParkingSpace:
-            true
-        case .bulkyWaste, .contamination, .damage, .other:
-            false
+    public var rawValue: String { name }
+    public var isBuiltIn: Bool { id.hasPrefix("builtin.") }
+
+    public static let unauthorizedVehicle = builtIn(
+        "unauthorizedVehicle", "Unberechtigt abgestelltes Fahrzeug", vehicle: true, order: 0
+    )
+    public static let blockedAccess = builtIn(
+        "blockedAccess", "Zufahrt oder Durchgang blockiert", vehicle: true, order: 1
+    )
+    public static let outsideParkingSpace = builtIn(
+        "outsideParkingSpace", "Fahrzeug außerhalb des Stellplatzes", vehicle: true, order: 2
+    )
+    public static let bulkyWaste = builtIn(
+        "bulkyWaste", "Sperrmüll oder unerlaubte Ablagerung", order: 3
+    )
+    public static let contamination = builtIn("contamination", "Verschmutzung", order: 4)
+    public static let damage = builtIn("damage", "Beschädigung", order: 5)
+    public static let heating = builtIn("heating", "Heizung oder Warmwasser", order: 6)
+    public static let waterDamage = builtIn("waterDamage", "Wasser- oder Feuchtigkeitsschaden", order: 7)
+    public static let lighting = builtIn("lighting", "Defekte Beleuchtung", order: 8)
+    public static let elevator = builtIn("elevator", "Aufzug", order: 9)
+    public static let accessSystem = builtIn("accessSystem", "Türen, Tore oder Schlösser", order: 10)
+    public static let noise = builtIn("noise", "Lärmbelästigung", order: 11)
+    public static let cleaning = builtIn("cleaning", "Reinigung", order: 12)
+    public static let pests = builtIn("pests", "Schädlingsbefall", order: 13)
+    public static let fireSafety = builtIn("fireSafety", "Brandschutz oder Gefahr", order: 14)
+    public static let commonFacilities = builtIn("commonFacilities", "Gemeinschaftsanlagen", order: 15)
+    public static let vandalism = builtIn("vandalism", "Vandalismus", order: 16)
+    public static let other = builtIn("other", "Sonstiges", order: 17)
+
+    public static let defaultCategories: [ReportCategory] = [
+        .unauthorizedVehicle, .blockedAccess, .outsideParkingSpace, .bulkyWaste,
+        .contamination, .damage, .heating, .waterDamage, .lighting, .elevator,
+        .accessSystem, .noise, .cleaning, .pests, .fireSafety, .commonFacilities,
+        .vandalism, .other
+    ]
+
+    public static var allCases: [ReportCategory] { defaultCategories }
+
+    private static func builtIn(
+        _ key: String,
+        _ name: String,
+        vehicle: Bool = false,
+        order: Int
+    ) -> ReportCategory {
+        ReportCategory(
+            id: "builtin.\(key)",
+            name: name,
+            defaultViolation: name,
+            expectsVehicle: vehicle,
+            sortOrder: order,
+            updatedAt: .distantPast
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, defaultViolation, expectsVehicle, isEnabled, isDeleted, sortOrder, updatedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        if let container = try? decoder.singleValueContainer(),
+           let legacyName = try? container.decode(String.self) {
+            if let builtIn = Self.defaultCategories.first(where: { $0.name == legacyName }) {
+                self = builtIn
+            } else {
+                self = ReportCategory(
+                    id: "legacy.\(Data(legacyName.utf8).base64EncodedString())",
+                    name: legacyName,
+                    updatedAt: .distantPast
+                )
+            }
+            return
         }
+
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        defaultViolation = try container.decodeIfPresent(String.self, forKey: .defaultViolation) ?? name
+        expectsVehicle = try container.decodeIfPresent(Bool.self, forKey: .expectsVehicle) ?? false
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+        isDeleted = try container.decodeIfPresent(Bool.self, forKey: .isDeleted) ?? false
+        sortOrder = try container.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? .distantPast
     }
 }
 

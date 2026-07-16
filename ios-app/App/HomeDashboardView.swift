@@ -56,7 +56,12 @@ struct HomeDashboardView: View {
             }
 
             Section {
-                Label("Fotos, Fälle und Einstellungen bleiben lokal auf diesem Gerät.", systemImage: "lock.shield")
+                Label(
+                    store.iCloudSyncEnabled
+                        ? "Daten und Dokumente werden zusätzlich im privaten iCloud-Bereich gesichert."
+                        : "Fotos, Fälle und Einstellungen bleiben lokal auf diesem Gerät.",
+                    systemImage: "lock.shield"
+                )
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

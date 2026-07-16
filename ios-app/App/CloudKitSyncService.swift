@@ -130,7 +130,7 @@ final class CloudKitSyncService {
     ) throws {
         record.encryptedValues["payload"] = try encoder.encode(state) as CKRecordValue
         record.encryptedValues["stateModifiedAt"] = modifiedAt as CKRecordValue
-        record.encryptedValues["schemaVersion"] = NSNumber(value: 2)
+        record.encryptedValues["schemaVersion"] = NSNumber(value: 3)
     }
 
     private func hasLocalContent(_ state: AppDataState) -> Bool {
@@ -138,6 +138,8 @@ final class CloudKitSyncService {
             || !state.properties.isEmpty
             || !state.propertyManagements.isEmpty
             || !state.reportedCases.isEmpty
+            || state.reportCategories != ReportCategory.defaultCategories
+            || state.preferences != AppPreferences()
     }
 
     private func merge(local: AppDataState, remote: AppDataState) -> AppDataState {
@@ -176,12 +178,24 @@ final class CloudKitSyncService {
         let deletedRecordNames = Set(local.deletedCloudFileRecordNames)
             .union(remote.deletedCloudFileRecordNames)
 
+        var categories = Dictionary(uniqueKeysWithValues: remote.reportCategories.map { ($0.id, $0) })
+        for category in local.reportCategories {
+            if let remoteCategory = categories[category.id], remoteCategory.updatedAt > category.updatedAt {
+                continue
+            }
+            categories[category.id] = category
+        }
+
         let profile = local.profile.fullName.isEmpty ? remote.profile : local.profile
         return AppDataState(
             profile: profile,
             properties: properties.values.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending },
             propertyManagements: managements.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending },
             reportedCases: cases.values.sorted { $0.createdAt > $1.createdAt },
+            reportCategories: categories.values.sorted {
+                if $0.sortOrder == $1.sortOrder { return $0.name < $1.name }
+                return $0.sortOrder < $1.sortOrder
+            },
             preferences: local.preferences,
             deletedCases: deletedCases.values.sorted { $0.deletedAt < $1.deletedAt },
             deletedCloudFileRecordNames: deletedRecordNames.sorted()

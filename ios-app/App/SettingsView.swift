@@ -49,6 +49,17 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Meldekategorien") {
+                NavigationLink {
+                    ReportCategoryManagementView()
+                } label: {
+                    Label("Kategorien verwalten", systemImage: "list.bullet.rectangle")
+                }
+                Text("Eigene Kategorien können festlegen, ob Fahrzeug- und Kennzeichenfelder benötigt werden.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Meldungsdokument") {
                 Picker(
                     "Technische Dokumentation",
@@ -148,6 +159,119 @@ struct SettingsView: View {
             get: { store.lastError != nil },
             set: { if !$0 { store.clearError() } }
         )
+    }
+}
+
+private struct ReportCategoryManagementView: View {
+    @EnvironmentObject private var store: AppDataStore
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(store.configurableReportCategories) { category in
+                    NavigationLink {
+                        ReportCategoryEditorView(category: category)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack {
+                                Text(category.name)
+                                if category.isBuiltIn {
+                                    Text("Standard")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if !category.isEnabled {
+                                    Text("Ausgeblendet")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Text(category.expectsVehicle ? "Mit Fahrzeug- und Kennzeichenfeldern" : category.defaultViolation)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        if !category.isBuiltIn {
+                            Button(role: .destructive) {
+                                store.deleteReportCategory(category.id)
+                            } label: {
+                                Label("Löschen", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+                .onMove(perform: store.moveReportCategories)
+            } footer: {
+                Text("Standardkategorien können ausgeblendet, aber nicht gelöscht werden. Frühere Meldungen behalten ihre ursprüngliche Kategorie.")
+            }
+        }
+        .navigationTitle("Meldekategorien")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) { EditButton() }
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    ReportCategoryEditorView(
+                        category: ReportCategory(
+                            name: "",
+                            sortOrder: (store.configurableReportCategories.map(\.sortOrder).max() ?? -1) + 1
+                        )
+                    )
+                } label: {
+                    Label("Kategorie hinzufügen", systemImage: "plus")
+                }
+            }
+        }
+    }
+}
+
+private struct ReportCategoryEditorView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var store: AppDataStore
+    @State private var category: ReportCategory
+
+    init(category: ReportCategory) {
+        _category = State(initialValue: category)
+    }
+
+    var body: some View {
+        Form {
+            Section("Kategorie") {
+                TextField("Name", text: $category.name)
+                    .disabled(category.isBuiltIn)
+                TextField("Voreingestellter Meldegrund", text: $category.defaultViolation, axis: .vertical)
+                    .lineLimit(2...4)
+                    .disabled(category.isBuiltIn)
+                Toggle("In neuen Meldungen anzeigen", isOn: $category.isEnabled)
+            }
+
+            Section("Eingabefelder") {
+                Toggle("Fahrzeugbezogene Meldung", isOn: $category.expectsVehicle)
+                    .disabled(category.isBuiltIn)
+                Text(category.expectsVehicle
+                    ? "Kennzeichen und Fahrzeugbeschreibung werden angeboten; das Kennzeichen ist ein Pflichtfeld."
+                    : "Die Meldung verwendet nur Ort, Meldegrund, Beschreibung und optionale Zeugen.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle(category.isBuiltIn ? "Standardkategorie" : "Eigene Kategorie")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Speichern") {
+                    if category.isBuiltIn {
+                        store.setReportCategoryEnabled(category.isEnabled, id: category.id)
+                    } else {
+                        store.upsertReportCategory(category)
+                    }
+                    dismiss()
+                }
+                .disabled(category.name.trimmedIsEmpty || category.defaultViolation.trimmedIsEmpty)
+            }
+        }
     }
 }
 
