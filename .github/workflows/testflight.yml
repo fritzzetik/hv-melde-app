@@ -47,6 +47,8 @@ jobs:
 
       - name: Archivieren
         env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -o pipefail
@@ -57,8 +59,24 @@ jobs:
             -archivePath build/HVMeldeApp.xcarchive \
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_STYLE=Automatic \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID" \
+            -authenticationKeyPath ~/private_keys/AuthKey_${KEY_ID}.p8 \
             | xcbeautify --renderer github-actions
+
+      - name: iCloud-Entitlements prüfen
+        run: |
+          set -o pipefail
+          APP_PATH="build/HVMeldeApp.xcarchive/Products/Applications/HV Melde App.app"
+          codesign -d --entitlements :- "$APP_PATH" > build/archived-entitlements.plist
+          plutil -p build/archived-entitlements.plist
+          CONTAINER=$(plutil -extract com.apple.developer.icloud-container-identifiers.0 raw build/archived-entitlements.plist)
+          if [ "$CONTAINER" != "iCloud.at.zetik.hvmeldeapp" ]; then
+            echo "::error::Erwarteter iCloud-Container fehlt im signierten Archiv: $CONTAINER"
+            exit 1
+          fi
 
       - name: Exportieren und zu TestFlight hochladen
         env:

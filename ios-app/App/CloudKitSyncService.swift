@@ -32,6 +32,8 @@ struct CloudSyncResult: Sendable {
 
 @MainActor
 final class CloudKitSyncService {
+    static let containerIdentifier = "iCloud.at.zetik.hvmeldeapp"
+
     private let container: CKContainer
     private let database: CKDatabase
     private let recordID = CKRecord.ID(recordName: "primary-app-data")
