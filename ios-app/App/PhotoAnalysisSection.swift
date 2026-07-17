@@ -17,6 +17,7 @@ struct PhotoAnalysisSection: View {
     @State private var selectedItem: PhotosPickerItem?
     @State private var photoPickerIdentity = UUID()
     @State private var reviewTarget: ImageAnalysisReviewTarget?
+    @State private var showsAnalysisReview = false
     @State private var analysisResults: [UUID: LocalImageAnalysis] = [:]
     @State private var analyzingPhotoID: UUID?
     @State private var isAnalyzing = false
@@ -114,10 +115,7 @@ struct PhotoAnalysisSection: View {
 
                     if let result = analysisResults[photo.id] {
                         Button {
-                            reviewTarget = ImageAnalysisReviewTarget(
-                                photoID: photo.id,
-                                analysis: result
-                            )
+                            presentReview(for: photo, analysis: result)
                         } label: {
                             Label("Erkannte Werte prüfen und übernehmen", systemImage: "checkmark.circle")
                         }
@@ -150,6 +148,7 @@ struct PhotoAnalysisSection: View {
             resetForNewReport()
         }
         .onChange(of: category) { _, _ in
+            showsAnalysisReview = false
             reviewTarget = nil
             analysisResults = [:]
         }
@@ -162,19 +161,25 @@ struct PhotoAnalysisSection: View {
             }
             .ignoresSafeArea()
         }
-        .sheet(item: $reviewTarget) { target in
-            ImageAnalysisReviewView(
-                analysis: target.analysis,
-                currentLicensePlate: licensePlate,
-                currentVehicleDescription: vehicleDescription
-            ) { confirmedPlate, confirmedVehicle, confirmedSummary in
-                applyConfirmation(
-                    target.analysis,
-                    photoID: target.photoID,
-                    plate: confirmedPlate,
-                    vehicle: confirmedVehicle,
-                    summary: confirmedSummary
-                )
+        .sheet(isPresented: $showsAnalysisReview, onDismiss: {
+            reviewTarget = nil
+        }) {
+            if let target = reviewTarget {
+                ImageAnalysisReviewView(
+                    analysis: target.analysis,
+                    currentLicensePlate: licensePlate,
+                    currentVehicleDescription: vehicleDescription
+                ) { confirmedPlate, confirmedVehicle, confirmedSummary in
+                    applyConfirmation(
+                        target.analysis,
+                        photoID: target.photoID,
+                        plate: confirmedPlate,
+                        vehicle: confirmedVehicle,
+                        summary: confirmedSummary
+                    )
+                }
+            } else {
+                ProgressView()
             }
         }
         .alert("Bildverarbeitung fehlgeschlagen", isPresented: errorIsPresented) {
@@ -190,6 +195,7 @@ struct PhotoAnalysisSection: View {
         importTask = nil
         selectedItem = nil
         photoPickerIdentity = UUID()
+        showsAnalysisReview = false
         reviewTarget = nil
         analysisResults = [:]
         analyzingPhotoID = nil
@@ -197,6 +203,15 @@ struct PhotoAnalysisSection: View {
         isImporting = false
         showsCamera = false
         errorMessage = nil
+    }
+
+    private func presentReview(for photo: EvidencePhoto, analysis: LocalImageAnalysis) {
+        reviewTarget = ImageAnalysisReviewTarget(photoID: photo.id, analysis: analysis)
+        Task { @MainActor in
+            await Task<Void, Never>.yield()
+            guard reviewTarget?.photoID == photo.id else { return }
+            showsAnalysisReview = true
+        }
     }
 
     @ViewBuilder
@@ -284,6 +299,7 @@ struct PhotoAnalysisSection: View {
             fileExtension: fileExtension
         )
         evidencePhotos.append(evidencePhoto)
+        showsAnalysisReview = false
         reviewTarget = nil
         errorMessage = nil
     }
@@ -366,7 +382,10 @@ struct PhotoAnalysisSection: View {
                 await MainActor.run {
                     evidencePhotos.removeAll { $0.id == photo.id }
                     analysisResults[photo.id] = nil
-                    if reviewTarget?.photoID == photo.id { reviewTarget = nil }
+                    if reviewTarget?.photoID == photo.id {
+                        showsAnalysisReview = false
+                        reviewTarget = nil
+                    }
                 }
             } catch {
                 await MainActor.run { errorMessage = error.localizedDescription }
