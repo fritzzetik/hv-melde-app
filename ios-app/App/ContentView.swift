@@ -432,28 +432,18 @@ private struct NewReportView: View {
     }
 
     private func translateReportText(using session: TranslationSession) async throws -> PDFReportRenderer.ReportTextTranslation {
-        let fields = [
-            ("location", garageLocation),
-            ("violation", violation),
-            ("notes", notes),
-            ("vehicleDescription", vehicleDescription),
-            ("witnesses", witnesses)
-        ]
-        let requests = fields.compactMap { identifier, text -> TranslationSession.Request? in
-            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-            return TranslationSession.Request(sourceText: text, clientIdentifier: identifier)
-        }
-        let responses = try await session.translations(from: requests)
-        let translations = Dictionary(uniqueKeysWithValues: responses.compactMap { response in
-            response.clientIdentifier.map { ($0, response.targetText) }
-        })
         return PDFReportRenderer.ReportTextTranslation(
-            location: translations["location"] ?? garageLocation,
-            violation: translations["violation"] ?? violation,
-            notes: translations["notes"] ?? notes,
-            vehicleDescription: translations["vehicleDescription"] ?? vehicleDescription,
-            witnesses: translations["witnesses"] ?? witnesses
+            location: try await translate(garageLocation, using: session),
+            violation: try await translate(violation, using: session),
+            notes: try await translate(notes, using: session),
+            vehicleDescription: try await translate(vehicleDescription, using: session),
+            witnesses: try await translate(witnesses, using: session)
         )
+    }
+
+    private func translate(_ text: String, using session: TranslationSession) async throws -> String {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return text }
+        return try await session.translate(text).targetText
     }
 
     private func generatePDF(translatedText: PDFReportRenderer.ReportTextTranslation?) {
