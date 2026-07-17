@@ -21,6 +21,8 @@ Serverlose iPhone-App zur strukturierten Dokumentation von Vorfällen in verwalt
 
 Über das Zahnrad lassen sich persönliche Absenderdaten, mehrere Objekte und wiederverwendbare Hausverwaltungen lokal hinterlegen. Jedes Objekt besitzt einen internen Namen, eine optionale offizielle Bezeichnung, einen Objekttyp, eine strukturierte Anschrift, eine eigene Melde-E-Mail-Adresse und die Zuordnung „Mieter“ oder „Eigentümer“.
 
+Beim ersten Start führt ein mehrseitiges Tutorial durch die erforderliche Einrichtung und den Meldeablauf. Es kann später unter „Einstellungen → Hilfe“ erneut geöffnet werden.
+
 Erzeugte Meldungen werden mit ihrem PDF dauerhaft im geschützten App-Verzeichnis gespeichert. Über das Fallarchiv lassen sie sich als offen oder erledigt führen, wieder öffnen und erneut teilen. Pro Meldung wird festgehalten, ob sie das gemietete beziehungsweise eigene Objekt oder eine Allgemeinfläche betrifft. Eine spätere Synchronisierung über den persönlichen iCloud-Account ist vorbereitet, aber noch nicht aktiviert.
 
 Für die lokale Bilderkennung wählt die Nutzerin oder der Nutzer eine feste Meldekategorie und importiert ein Foto oder nimmt es direkt auf. Apple Vision klassifiziert das Bild und liest mögliche Kennzeichen. Die zweite Erkennungsstufe schlägt zusätzlich Fahrzeugtyp, eine heuristisch bestimmte Farbe und relevante Nebenobjekte wie Matratze oder Sperrmüll vor. Vorschläge werden erst nach manueller Prüfung in die Meldung übernommen.

@@ -4,9 +4,16 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var store: AppDataStore
     @AppStorage(AppLanguagePreference.storageKey) private var appLanguageRawValue = AppLanguagePreference.system.rawValue
+    let showOnboarding: () -> Void
 
     var body: some View {
         List {
+            Section("Hilfe") {
+                Button(action: showOnboarding) {
+                    Label("Anleitung und erste Schritte", systemImage: "questionmark.circle")
+                }
+            }
+
             Section("Sprache und Region") {
                 Picker("App-Sprache", selection: appLanguageSelection) {
                     ForEach(AppLanguagePreference.allCases) { language in

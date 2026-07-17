@@ -9,10 +9,12 @@ private enum AppTab: Hashable {
 
 struct ContentView: View {
     @EnvironmentObject private var store: AppDataStore
+    @AppStorage("hasCompletedOnboardingV1") private var hasCompletedOnboarding = false
     @State private var selectedTab: AppTab = .home
     @State private var pendingTab: AppTab?
     @State private var showsLeaveWarning = false
     @State private var hasUnsavedDraft = false
+    @State private var showsOnboarding = false
 
     var body: some View {
         TabView(selection: tabSelection) {
@@ -35,11 +37,29 @@ struct ContentView: View {
                 .badge(store.state.reportedCases.filter { $0.status == .open }.count)
                 .tag(AppTab.cases)
 
-            NavigationStack { SettingsView() }
+            NavigationStack {
+                SettingsView(showOnboarding: { showsOnboarding = true })
+            }
                 .tabItem { Label("Einstellungen", systemImage: "gearshape") }
                 .tag(AppTab.settings)
         }
-        .onAppear { hasUnsavedDraft = store.incidentDraft != nil }
+        .onAppear {
+            hasUnsavedDraft = store.incidentDraft != nil
+            if !hasCompletedOnboarding { showsOnboarding = true }
+        }
+        .fullScreenCover(isPresented: $showsOnboarding) {
+            OnboardingView(
+                onSkip: {
+                    hasCompletedOnboarding = true
+                    showsOnboarding = false
+                },
+                onStartSetup: {
+                    hasCompletedOnboarding = true
+                    showsOnboarding = false
+                    selectedTab = .settings
+                }
+            )
+        }
         .alert("Meldung verlassen?", isPresented: $showsLeaveWarning) {
             Button("Entwurf behalten und verlassen") {
                 if let pendingTab { selectedTab = pendingTab }
