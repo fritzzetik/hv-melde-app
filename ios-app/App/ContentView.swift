@@ -1,7 +1,7 @@
 import HVMeldeCore
 import MessageUI
 import SwiftUI
-import Translation
+@preconcurrency import Translation
 
 private enum AppTab: Hashable {
     case home, report, cases, settings
