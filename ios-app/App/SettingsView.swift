@@ -3,9 +3,22 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var store: AppDataStore
+    @AppStorage(AppLanguagePreference.storageKey) private var appLanguageRawValue = AppLanguagePreference.system.rawValue
 
     var body: some View {
         List {
+            Section("Sprache und Region") {
+                Picker("App-Sprache", selection: appLanguageSelection) {
+                    ForEach(AppLanguagePreference.allCases) { language in
+                        Text(LocalizedStringKey(language.displayName)).tag(language)
+                    }
+                }
+
+                Text("Ohne manuelle Auswahl übernimmt die App Sprache und Region aus den iOS-Einstellungen.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("iCloud") {
                 Toggle(
                     "Daten mit iCloud synchronisieren",
@@ -152,6 +165,13 @@ struct SettingsView: View {
 
     private var profileLabel: String {
         store.state.profile.fullName.isEmpty ? "Persönliche Daten eintragen" : store.state.profile.fullName
+    }
+
+    private var appLanguageSelection: Binding<AppLanguagePreference> {
+        Binding(
+            get: { AppLanguagePreference(rawValue: appLanguageRawValue) ?? .system },
+            set: { appLanguageRawValue = $0.rawValue }
+        )
     }
 
     private var errorIsPresented: Binding<Bool> {

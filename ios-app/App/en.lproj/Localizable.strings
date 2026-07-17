@@ -168,3 +168,11 @@
 "Weitere mögliche Objekte" = "Other possible objects";
 "Technische Nachvollziehbarkeit" = "Technical traceability";
 "Bitte bestätige nur Angaben, die du selbst am Originalfoto nachvollziehen kannst." = "Only confirm details that you can verify yourself in the original photograph.";
+"Sprache und Region" = "Language and region";
+"App-Sprache" = "App language";
+"Systemeinstellung" = "System setting";
+"Deutsch (Österreich)" = "German (Austria)";
+"Deutsch (Deutschland)" = "German (Germany)";
+"Deutsch (Schweiz)" = "German (Switzerland)";
+"Deutsch (Liechtenstein)" = "German (Liechtenstein)";
+"Ohne manuelle Auswahl übernimmt die App Sprache und Region aus den iOS-Einstellungen." = "Without a manual selection, the app uses the language and region from iOS Settings.";

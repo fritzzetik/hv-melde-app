@@ -1,6 +1,7 @@
 name: HVMeldeApp
 options:
   bundleIdPrefix: at.zetik
+  developmentLanguage: de
   deploymentTarget:
     iOS: "26.0"
 packages:
