@@ -94,6 +94,7 @@ private struct NewReportView: View {
     @State private var showsCancelConfirmation = false
     @State private var translationConfiguration: TranslationSession.Configuration?
     @State private var isGeneratingPDF = false
+    @State private var translationProgressText: String?
     @State private var translatedTextReview: PDFReportRenderer.ReportTextTranslation?
     @State private var showsTranslationReview = false
 
@@ -313,9 +314,16 @@ private struct NewReportView: View {
         Section {
             Button(action: startPDFGeneration) {
                 if isGeneratingPDF {
-                    HStack {
-                        ProgressView()
-                        Text("PDF wird erstellt …")
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            ProgressView()
+                            Text("PDF wird erstellt …")
+                        }
+                        if let translationProgressText {
+                            Text(translationProgressText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 } else {
                     Text("PDF erzeugen")
@@ -393,32 +401,59 @@ private struct NewReportView: View {
         }
 
         isGeneratingPDF = true
-        translationConfiguration = TranslationSession.Configuration(
+        translationProgressText = "Übersetzungsmodell wird vorbereitet …"
+        errorMessage = nil
+        translatedTextReview = nil
+        let configuration = TranslationSession.Configuration(
             source: Locale.Language(identifier: "de"),
             target: Locale.Language(identifier: targetCode)
         )
+        if translationConfiguration == configuration {
+            translationConfiguration?.invalidate()
+        } else {
+            translationConfiguration = configuration
+        }
     }
 
     private func translateAndGeneratePDF(using session: TranslationSession) async {
         do {
-            let translatedText = PDFReportRenderer.ReportTextTranslation(
-                location: try await translate(garageLocation, using: session),
-                violation: try await translate(violation, using: session),
-                notes: try await translate(notes, using: session),
-                vehicleDescription: try await translate(vehicleDescription, using: session),
-                witnesses: try await translate(witnesses, using: session)
-            )
+            try await session.prepareTranslation()
+            translationProgressText = "Freitexte werden lokal übersetzt …"
+            let translatedText = try await translateReportText(using: session)
+            translationProgressText = nil
             translatedTextReview = translatedText
             showsTranslationReview = true
         } catch {
             isGeneratingPDF = false
+            translationProgressText = nil
+            translationConfiguration = nil
             errorMessage = "Die lokale Übersetzung konnte nicht erstellt werden: \(error.localizedDescription)"
         }
     }
 
-    private func translate(_ text: String, using session: TranslationSession) async throws -> String {
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return text }
-        return try await session.translate(text).targetText
+    private func translateReportText(using session: TranslationSession) async throws -> PDFReportRenderer.ReportTextTranslation {
+        let fields = [
+            ("location", garageLocation),
+            ("violation", violation),
+            ("notes", notes),
+            ("vehicleDescription", vehicleDescription),
+            ("witnesses", witnesses)
+        ]
+        let requests = fields.compactMap { identifier, text -> TranslationSession.Request? in
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            return TranslationSession.Request(sourceText: text, clientIdentifier: identifier)
+        }
+        let responses = try await session.translations(from: requests)
+        let translations = Dictionary(uniqueKeysWithValues: responses.compactMap { response in
+            response.clientIdentifier.map { ($0, response.targetText) }
+        })
+        return PDFReportRenderer.ReportTextTranslation(
+            location: translations["location"] ?? garageLocation,
+            violation: translations["violation"] ?? violation,
+            notes: translations["notes"] ?? notes,
+            vehicleDescription: translations["vehicleDescription"] ?? vehicleDescription,
+            witnesses: translations["witnesses"] ?? witnesses
+        )
     }
 
     private func generatePDF(translatedText: PDFReportRenderer.ReportTextTranslation?) {
@@ -486,6 +521,7 @@ private struct NewReportView: View {
             store.clearDraft()
             hasUnsavedDraft = false
             isGeneratingPDF = false
+            translationProgressText = nil
         } catch let validationError as IncidentReportValidationError {
             let labels = validationError.missingFields.map(fieldLabel).joined(separator: ", ")
             errorMessage = "Bitte fülle folgende Pflichtfelder aus: \(labels)."
@@ -515,6 +551,8 @@ private struct NewReportView: View {
         generatedTechnicalJSON = nil
         mailDraft = nil
         errorMessage = nil
+        translationProgressText = nil
+        translationConfiguration = nil
         store.clearDraft()
         hasUnsavedDraft = false
         currentStep = .object

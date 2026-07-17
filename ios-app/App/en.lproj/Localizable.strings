@@ -176,3 +176,5 @@
 "Deutsch (Schweiz)" = "German (Switzerland)";
 "Deutsch (Liechtenstein)" = "German (Liechtenstein)";
 "Ohne manuelle Auswahl übernimmt die App Sprache und Region aus den iOS-Einstellungen." = "Without a manual selection, the app uses the language and region from iOS Settings.";
+"Übersetzungsmodell wird vorbereitet …" = "Preparing the translation model…";
+"Freitexte werden lokal übersetzt …" = "Translating free-text fields on device…";

@@ -15,6 +15,7 @@ struct PhotoAnalysisSection: View {
     @Binding var notes: String
 
     @State private var selectedItem: PhotosPickerItem?
+    @State private var photoPickerIdentity = UUID()
     @State private var reviewTarget: ImageAnalysisReviewTarget?
     @State private var analysisResults: [UUID: LocalImageAnalysis] = [:]
     @State private var analyzingPhotoID: UUID?
@@ -36,6 +37,7 @@ struct PhotoAnalysisSection: View {
                     systemImage: "photo"
                 )
             }
+            .id(photoPickerIdentity)
             .disabled(isImporting || isAnalyzing || evidencePhotos.count >= 10)
 
             if UIImagePickerController.isSourceTypeAvailable(.camera) {
@@ -140,8 +142,12 @@ struct PhotoAnalysisSection: View {
         .onChange(of: selectedItem) { _, newItem in
             guard let newItem else { return }
             selectedItem = nil
+            photoPickerIdentity = UUID()
             importTask?.cancel()
             importTask = Task { await loadImage(from: newItem) }
+        }
+        .onChange(of: reportID) { _, _ in
+            resetForNewReport()
         }
         .onChange(of: category) { _, _ in
             reviewTarget = nil
@@ -176,10 +182,21 @@ struct PhotoAnalysisSection: View {
         } message: {
             Text(errorMessage ?? "Unbekannter Fehler")
         }
-        .onDisappear {
-            importTask?.cancel()
-            importTask = nil
-        }
+    }
+
+    @MainActor
+    private func resetForNewReport() {
+        importTask?.cancel()
+        importTask = nil
+        selectedItem = nil
+        photoPickerIdentity = UUID()
+        reviewTarget = nil
+        analysisResults = [:]
+        analyzingPhotoID = nil
+        isAnalyzing = false
+        isImporting = false
+        showsCamera = false
+        errorMessage = nil
     }
 
     @ViewBuilder
