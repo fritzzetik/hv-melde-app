@@ -208,7 +208,7 @@ struct PhotoAnalysisSection: View {
     private func presentReview(for photo: EvidencePhoto, analysis: LocalImageAnalysis) {
         reviewTarget = ImageAnalysisReviewTarget(photoID: photo.id, analysis: analysis)
         Task { @MainActor in
-            await Task<Void, Never>.yield()
+            try? await Task<Never, Never>.sleep(for: .milliseconds(50))
             guard reviewTarget?.photoID == photo.id else { return }
             showsAnalysisReview = true
         }
