@@ -362,21 +362,6 @@ private struct PropertyEditorView: View {
                     .autocorrectionDisabled()
             }
 
-            Section("Meldungsdokument") {
-                Picker("Briefsprache", selection: $management.reportLanguage) {
-                    ForEach(ReportLanguage.allCases) { language in
-                        Text(LocalizedStringKey(language.displayName)).tag(language)
-                    }
-                }
-                Text("Bei Deutsch + Italienisch enthält das PDF beide Briefversionen. Beweisfotos und technische Anlagen werden nur einmal angefügt.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if management.reportLanguage != .german {
-                    Text("Sachliche Freitextfelder werden vor der PDF-Erstellung mit Apples lokalem Sprachmodell übersetzt. Das Original bleibt bei bilingualen PDFs auf der deutschen Briefseite erhalten.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
         }
         .navigationTitle(property.name.trimmedIsEmpty ? "Neues Objekt" : property.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -431,12 +416,17 @@ private struct PropertyManagementEditorView: View {
             Section("Meldungsdokument") {
                 Picker("Briefsprache", selection: $management.reportLanguage) {
                     ForEach(ReportLanguage.allCases) { language in
-                        Text(language.displayName).tag(language)
+                        Text(LocalizedStringKey(language.displayName)).tag(language)
                     }
                 }
                 Text("Bei Deutsch + Italienisch enthält das PDF beide Briefversionen. Beweisfotos und technische Anlagen werden nur einmal angefügt.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if management.reportLanguage != .german {
+                    Text("Sachliche Freitextfelder werden vor der PDF-Erstellung mit Apples lokalem Sprachmodell übersetzt. Das Original bleibt bei bilingualen PDFs auf der deutschen Briefseite erhalten.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .navigationTitle(management.name.trimmedIsEmpty ? "Neue Hausverwaltung" : management.name)
