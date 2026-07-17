@@ -336,12 +336,12 @@ private struct PropertyEditorView: View {
                 TextField("Offizieller Objektname (optional)", text: $property.officialName)
                 Picker("Objekttyp", selection: $property.propertyType) {
                     ForEach(PropertyType.allCases) { type in
-                        Text(type.rawValue).tag(type)
+                        Text(LocalizedStringKey(type.rawValue)).tag(type)
                     }
                 }
                 Picker("Nutzungsverhältnis", selection: $property.occupancyRole) {
                     ForEach(OccupancyRole.allCases) { role in
-                        Text(role.rawValue).tag(role)
+                        Text(LocalizedStringKey(role.rawValue)).tag(role)
                     }
                 }
             }
@@ -360,6 +360,22 @@ private struct PropertyEditorView: View {
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+            }
+
+            Section("Meldungsdokument") {
+                Picker("Briefsprache", selection: $management.reportLanguage) {
+                    ForEach(ReportLanguage.allCases) { language in
+                        Text(LocalizedStringKey(language.displayName)).tag(language)
+                    }
+                }
+                Text("Bei Deutsch + Italienisch enthält das PDF beide Briefversionen. Beweisfotos und technische Anlagen werden nur einmal angefügt.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if management.reportLanguage != .german {
+                    Text("Sachliche Freitextfelder werden vor der PDF-Erstellung mit Apples lokalem Sprachmodell übersetzt. Das Original bleibt bei bilingualen PDFs auf der deutschen Briefseite erhalten.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .navigationTitle(property.name.trimmedIsEmpty ? "Neues Objekt" : property.name)
@@ -411,6 +427,17 @@ private struct PropertyManagementEditorView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
             }
+
+            Section("Meldungsdokument") {
+                Picker("Briefsprache", selection: $management.reportLanguage) {
+                    ForEach(ReportLanguage.allCases) { language in
+                        Text(language.displayName).tag(language)
+                    }
+                }
+                Text("Bei Deutsch + Italienisch enthält das PDF beide Briefversionen. Beweisfotos und technische Anlagen werden nur einmal angefügt.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .navigationTitle(management.name.trimmedIsEmpty ? "Neue Hausverwaltung" : management.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -441,7 +468,7 @@ private struct AddressFields: View {
                 .textContentType(.addressCity)
             Picker("Land", selection: $address.country) {
                 ForEach(SupportedCountry.allCases) { country in
-                    Text(country.rawValue).tag(country)
+                    Text(LocalizedStringKey(country.rawValue)).tag(country)
                 }
             }
         }

@@ -1,6 +1,7 @@
 import HVMeldeCore
 import MessageUI
 import SwiftUI
+import Translation
 
 private enum AppTab: Hashable {
     case home, report, cases, settings
@@ -91,6 +92,10 @@ private struct NewReportView: View {
     @State private var currentStep: ReportStep = .object
     @State private var suppressNextCategoryReset = false
     @State private var showsCancelConfirmation = false
+    @State private var translationConfiguration: TranslationSession.Configuration?
+    @State private var isGeneratingPDF = false
+    @State private var translatedTextReview: PDFReportRenderer.ReportTextTranslation?
+    @State private var showsTranslationReview = false
 
     var body: some View {
         NavigationStack {
@@ -173,6 +178,18 @@ private struct NewReportView: View {
             .sheet(item: $mailDraft) { draft in
                 MailComposerView(draft: draft)
             }
+            .sheet(isPresented: $showsTranslationReview, onDismiss: {
+                if translatedTextReview != nil { isGeneratingPDF = false }
+                translatedTextReview = nil
+            }) {
+                if let translatedTextReview {
+                    TranslationReviewView(initialTranslation: translatedTextReview) { confirmedTranslation in
+                        self.translatedTextReview = nil
+                        showsTranslationReview = false
+                        generatePDF(translatedText: confirmedTranslation)
+                    }
+                }
+            }
             .alert("Meldung konnte nicht gespeichert werden", isPresented: errorIsPresented) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -189,6 +206,9 @@ private struct NewReportView: View {
                 Button("Weiter bearbeiten", role: .cancel) {}
             } message: {
                 Text("Alle noch nicht als Fall gespeicherten Angaben und Beweisfotos dieser Meldung werden entfernt.")
+            }
+            .translationTask(translationConfiguration) { session in
+                await translateAndGeneratePDF(using: session)
             }
         }
     }
@@ -291,8 +311,17 @@ private struct NewReportView: View {
             LabeledContent("Namensweitergabe erlaubt", value: allowsNameDisclosure ? "Ja" : "Nein")
         }
         Section {
-            Button("PDF erzeugen", action: generatePDF)
-                .disabled(selectedProperty == nil)
+            Button(action: startPDFGeneration) {
+                if isGeneratingPDF {
+                    HStack {
+                        ProgressView()
+                        Text("PDF wird erstellt …")
+                    }
+                } else {
+                    Text("PDF erzeugen")
+                }
+            }
+                .disabled(selectedProperty == nil || isGeneratingPDF)
             if let generatedPDF {
                 Label("Fall wurde lokal gespeichert", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
@@ -352,9 +381,50 @@ private struct NewReportView: View {
         selectedPropertyID = store.state.properties.first?.id
     }
 
-    private func generatePDF() {
+    private func startPDFGeneration() {
         guard let property = selectedProperty else {
             errorMessage = "Bitte lege ein Objekt an und wähle es aus."
+            return
+        }
+        let language = store.management(for: property)?.reportLanguage ?? .german
+        guard let targetCode = language.targetLanguageCode else {
+            generatePDF(translatedText: nil)
+            return
+        }
+
+        isGeneratingPDF = true
+        translationConfiguration = TranslationSession.Configuration(
+            source: Locale.Language(identifier: "de"),
+            target: Locale.Language(identifier: targetCode)
+        )
+    }
+
+    private func translateAndGeneratePDF(using session: TranslationSession) async {
+        do {
+            let translatedText = PDFReportRenderer.ReportTextTranslation(
+                location: try await translate(garageLocation, using: session),
+                violation: try await translate(violation, using: session),
+                notes: try await translate(notes, using: session),
+                vehicleDescription: try await translate(vehicleDescription, using: session),
+                witnesses: try await translate(witnesses, using: session)
+            )
+            translatedTextReview = translatedText
+            showsTranslationReview = true
+        } catch {
+            isGeneratingPDF = false
+            errorMessage = "Die lokale Übersetzung konnte nicht erstellt werden: \(error.localizedDescription)"
+        }
+    }
+
+    private func translate(_ text: String, using session: TranslationSession) async throws -> String {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return text }
+        return try await session.translate(text).targetText
+    }
+
+    private func generatePDF(translatedText: PDFReportRenderer.ReportTextTranslation?) {
+        guard let property = selectedProperty else {
+            errorMessage = "Bitte lege ein Objekt an und wähle es aus."
+            isGeneratingPDF = false
             return
         }
 
@@ -383,7 +453,8 @@ private struct NewReportView: View {
                 property: property,
                 management: store.management(for: property),
                 evidencePhotos: evidencePhotos,
-                technicalAttachmentMode: store.state.preferences.technicalAttachmentMode
+                technicalAttachmentMode: store.state.preferences.technicalAttachmentMode,
+                translatedText: translatedText
             )
             let temporaryJSON = store.state.preferences.technicalAttachmentMode == .json
                 ? try TechnicalReportExporter.exportJSON(
@@ -414,11 +485,14 @@ private struct NewReportView: View {
             errorMessage = nil
             store.clearDraft()
             hasUnsavedDraft = false
+            isGeneratingPDF = false
         } catch let validationError as IncidentReportValidationError {
             let labels = validationError.missingFields.map(fieldLabel).joined(separator: ", ")
             errorMessage = "Bitte fülle folgende Pflichtfelder aus: \(labels)."
+            isGeneratingPDF = false
         } catch {
             errorMessage = store.lastError ?? error.localizedDescription
+            isGeneratingPDF = false
         }
     }
 
@@ -563,6 +637,51 @@ private struct NewReportView: View {
         case .garageLocation: "Bereich oder Ort im Objekt"
         case .licensePlate: "Kennzeichen"
         case .violation: "Meldegrund"
+        }
+    }
+}
+
+private struct TranslationReviewView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var translation: PDFReportRenderer.ReportTextTranslation
+    let onConfirm: (PDFReportRenderer.ReportTextTranslation) -> Void
+
+    init(
+        initialTranslation: PDFReportRenderer.ReportTextTranslation,
+        onConfirm: @escaping (PDFReportRenderer.ReportTextTranslation) -> Void
+    ) {
+        _translation = State(initialValue: initialTranslation)
+        self.onConfirm = onConfirm
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Übersetzte Angaben prüfen") {
+                    TextField("Bereich oder Ort im Objekt", text: $translation.location)
+                    TextField("Meldegrund", text: $translation.violation)
+                    TextField("Sachliche Beschreibung", text: $translation.notes, axis: .vertical)
+                        .lineLimit(3...8)
+                    if !translation.vehicleDescription.isEmpty {
+                        TextField("Fahrzeugbeschreibung", text: $translation.vehicleDescription)
+                    }
+                    if !translation.witnesses.isEmpty {
+                        TextField("Zeugen", text: $translation.witnesses)
+                    }
+                } footer: {
+                    Text("Du kannst die lokale Übersetzung vor der PDF-Erstellung korrigieren. Die Zielsprachenseite bleibt als KI-übersetzt gekennzeichnet; verbindlich ist die deutsche Originalfassung.")
+                }
+            }
+            .navigationTitle("Übersetzung prüfen")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Abbrechen") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("PDF erstellen") { onConfirm(translation) }
+                }
+            }
         }
     }
 }

@@ -88,25 +88,68 @@ public struct UserProfile: Codable, Equatable, Sendable {
     }
 }
 
+public enum ReportLanguage: String, CaseIterable, Codable, Identifiable, Sendable {
+    case german = "de"
+    case italian = "it"
+    case english = "en"
+    case germanItalian = "de-it"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .german: "Deutsch"
+        case .italian: "Italienisch"
+        case .english: "Englisch"
+        case .germanItalian: "Deutsch + Italienisch"
+        }
+    }
+
+    public var targetLanguageCode: String? {
+        switch self {
+        case .german: nil
+        case .italian, .germanItalian: "it"
+        case .english: "en"
+        }
+    }
+}
+
 public struct PropertyManagement: Codable, Equatable, Identifiable, Sendable {
     public let id: UUID
     public var name: String
     public var address: PostalAddress
     public var phone: String
     public var email: String
+    public var reportLanguage: ReportLanguage
 
     public init(
         id: UUID = UUID(),
         name: String = "",
         address: PostalAddress = PostalAddress(),
         phone: String = "",
-        email: String = ""
+        email: String = "",
+        reportLanguage: ReportLanguage = .german
     ) {
         self.id = id
         self.name = name
         self.address = address
         self.phone = phone
         self.email = email
+        self.reportLanguage = reportLanguage
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, address, phone, email, reportLanguage
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        address = try container.decodeIfPresent(PostalAddress.self, forKey: .address) ?? PostalAddress()
+        phone = try container.decodeIfPresent(String.self, forKey: .phone) ?? ""
+        email = try container.decodeIfPresent(String.self, forKey: .email) ?? ""
+        reportLanguage = try container.decodeIfPresent(ReportLanguage.self, forKey: .reportLanguage) ?? .german
     }
 }
 

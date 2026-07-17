@@ -47,6 +47,28 @@ func managementCanBeSharedByProperties() {
     #expect(first.propertyManagementID == second.propertyManagementID)
 }
 
+@Test("Hausverwaltung speichert die gewünschte Briefsprache")
+func propertyManagementReportLanguageRoundTrip() throws {
+    let original = PropertyManagement(name: "Amministrazione", reportLanguage: .germanItalian)
+    let decoded = try JSONDecoder().decode(PropertyManagement.self, from: JSONEncoder().encode(original))
+
+    #expect(decoded.reportLanguage == .germanItalian)
+}
+
+@Test("Bestehende Hausverwaltung verwendet weiterhin Deutsch")
+func legacyPropertyManagementDefaultsToGerman() throws {
+    let management = PropertyManagement(name: "Bestand")
+    var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(management)) as? [String: Any])
+    json.removeValue(forKey: "reportLanguage")
+
+    let decoded = try JSONDecoder().decode(
+        PropertyManagement.self,
+        from: JSONSerialization.data(withJSONObject: json)
+    )
+
+    #expect(decoded.reportLanguage == .german)
+}
+
 @Test("Stammdaten bleiben bei lokaler JSON-Speicherung erhalten")
 func appDataRoundTrip() throws {
     let management = PropertyManagement(name: "Beispiel Hausverwaltung", email: "hv@example.com")

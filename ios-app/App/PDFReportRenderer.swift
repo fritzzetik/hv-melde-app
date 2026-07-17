@@ -1,15 +1,36 @@
 import HVMeldeCore
 import UIKit
 
+private enum LetterLanguage: Equatable {
+    case german, italian, english
+
+    var localeIdentifier: String {
+        switch self {
+        case .german: "de_AT"
+        case .italian: "it_IT"
+        case .english: "en_GB"
+        }
+    }
+}
+
 @MainActor
 enum PDFReportRenderer {
+    struct ReportTextTranslation: Sendable {
+        var location: String
+        var violation: String
+        var notes: String
+        var vehicleDescription: String
+        var witnesses: String
+    }
+
     static func render(
         _ report: IncidentReport,
         profile: UserProfile,
         property: ManagedProperty,
         management: PropertyManagement?,
         evidencePhotos: [EvidencePhoto],
-        technicalAttachmentMode: TechnicalAttachmentMode
+        technicalAttachmentMode: TechnicalAttachmentMode,
+        translatedText: ReportTextTranslation? = nil
     ) throws -> URL {
         let pageBounds = CGRect(x: 0, y: 0, width: 595, height: 842)
         let renderer = UIGraphicsPDFRenderer(bounds: pageBounds)
@@ -17,24 +38,30 @@ enum PDFReportRenderer {
         let technicalPageCount = technicalAttachmentMode == .pdf
             ? 1 + evidencePhotos.count + analysisCount
             : 0
-        let totalPages = 1 + evidencePhotos.count + technicalPageCount
+        let letterLanguages = letterLanguages(for: management?.reportLanguage ?? .german)
+        let totalPages = letterLanguages.count + evidencePhotos.count + technicalPageCount
         let attachmentTitles = attachmentSummary(
             for: evidencePhotos,
             technicalAttachmentMode: technicalAttachmentMode
         )
         let data = renderer.pdfData { context in
-            var pageNumber = 1
-            beginPage(context, in: pageBounds)
-            drawLetter(
-                report,
-                profile: profile,
-                property: property,
-                management: management,
-                attachmentTitles: attachmentTitles,
-                technicalAttachmentMode: technicalAttachmentMode,
-                in: pageBounds
-            )
-            drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
+            var pageNumber = 0
+            for language in letterLanguages {
+                pageNumber += 1
+                beginPage(context, in: pageBounds)
+                drawLetter(
+                    report,
+                    profile: profile,
+                    property: property,
+                    management: management,
+                    attachmentTitles: attachmentTitles,
+                    technicalAttachmentMode: technicalAttachmentMode,
+                    language: language,
+                    translatedText: translatedText,
+                    in: pageBounds
+                )
+                drawFooter(report: report, page: pageNumber, totalPages: totalPages, in: pageBounds)
+            }
 
             var attachmentNumber = 1
             for evidencePhoto in evidencePhotos {
@@ -80,6 +107,15 @@ enum PDFReportRenderer {
             .appendingPathComponent("Meldung-\(report.id.uuidString).pdf")
         try data.write(to: url, options: .atomic)
         return url
+    }
+
+    private static func letterLanguages(for preference: ReportLanguage) -> [LetterLanguage] {
+        switch preference {
+        case .german: [.german]
+        case .italian: [.italian]
+        case .english: [.english]
+        case .germanItalian: [.german, .italian]
+        }
     }
 
     private static func drawEvidencePhoto(
@@ -295,8 +331,15 @@ enum PDFReportRenderer {
         management: PropertyManagement?,
         attachmentTitles: [String],
         technicalAttachmentMode: TechnicalAttachmentMode,
+        language: LetterLanguage,
+        translatedText: ReportTextTranslation?,
         in bounds: CGRect
     ) {
+        let copy = LetterCopy(language: language)
+        let usesTranslation = language != .german && translatedText != nil
+        let location = usesTranslation ? translatedText!.location : report.garageLocation
+        let violation = usesTranslation ? translatedText!.violation : report.violation
+        let notes = usesTranslation ? translatedText!.notes : report.notes
         let margin: CGFloat = 50
         let contentWidth = bounds.width - (2 * margin)
         var y: CGFloat = 34
@@ -318,7 +361,7 @@ enum PDFReportRenderer {
             margin: margin
         )
         drawRightAlignedText(
-            "MELDUNG",
+            copy.documentTitle,
             at: y,
             font: .boldSystemFont(ofSize: 8),
             color: accentColor,
@@ -329,12 +372,12 @@ enum PDFReportRenderer {
 
         let recipientName = management?.name.trimmingCharacters(in: .whitespacesAndNewlines)
         var recipientLines = [
-            recipientName?.isEmpty == false ? recipientName! : "An die zuständige Hausverwaltung"
+            recipientName?.isEmpty == false ? recipientName! : copy.defaultRecipient
         ]
         if let management, !management.address.formatted.isEmpty {
             recipientLines.append(postalAddressLines(management.address))
         } else if !property.reportEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            recipientLines.append("per E-Mail: \(property.reportEmail)")
+            recipientLines.append("\(copy.byEmail): \(property.reportEmail)")
         }
 
         y = 78
@@ -348,7 +391,7 @@ enum PDFReportRenderer {
         )
 
         drawRightAlignedText(
-            letterDateFormatter.string(from: report.createdAt),
+            letterDateFormatter(for: language).string(from: report.createdAt),
             at: max(154, y + 12),
             font: .systemFont(ofSize: 10.5),
             color: textColor,
@@ -358,7 +401,7 @@ enum PDFReportRenderer {
         y = max(198, y + 52)
 
         y = drawText(
-            reportSubject(report, property: property),
+            reportSubject(report, property: property, language: language, violation: violation, location: location),
             at: y,
             width: contentWidth,
             font: .boldSystemFont(ofSize: 15),
@@ -367,7 +410,7 @@ enum PDFReportRenderer {
         ) + 23
 
         y = drawText(
-            "Sehr geehrte Damen und Herren,",
+            copy.salutation,
             at: y,
             width: contentWidth,
             font: .systemFont(ofSize: 11.5),
@@ -375,16 +418,19 @@ enum PDFReportRenderer {
             margin: margin
         ) + 15
 
-        let scopePhrase: String
-        if report.isCommonArea {
-            scopePhrase = "auf einer Allgemeinfläche des unten genannten Objekts"
-        } else if property.occupancyRole == .tenant {
-            scopePhrase = "in meinem gemieteten Objekt"
-        } else {
-            scopePhrase = "in meinem Eigentumsobjekt"
+        if usesTranslation {
+            y = drawText(
+                copy.translationNotice,
+                at: y,
+                width: contentWidth,
+                font: .boldSystemFont(ofSize: 9.5),
+                color: accentColor,
+                margin: margin
+            ) + 12
         }
+
         y = drawText(
-            "hiermit informiere ich Sie über einen dokumentierten Vorfall \(scopePhrase). Ich ersuche um Prüfung und gegebenenfalls um die erforderlichen Maßnahmen.",
+            copy.introduction(isCommonArea: report.isCommonArea, occupancyRole: property.occupancyRole),
             at: y,
             width: contentWidth,
             font: .systemFont(ofSize: 11.5),
@@ -393,15 +439,15 @@ enum PDFReportRenderer {
         ) + 16
 
         var factLines = [
-            "Objekt: \(property.officialDisplayName)",
-            "Objekttyp: \(property.propertyType.rawValue)",
-            "Objektanschrift: \(property.address.formatted)",
-            "Beobachtet: \(dateFormatter.string(from: report.incidentAt))",
-            "Bereich: \(report.garageLocation)",
-            "Meldegrund: \(report.violation)"
+            "\(copy.objectLabel): \(property.officialDisplayName)",
+            "\(copy.objectTypeLabel): \(copy.propertyType(property.propertyType))",
+            "\(copy.objectAddressLabel): \(property.address.formatted)",
+            "\(copy.observedLabel): \(dateFormatter(for: language).string(from: report.incidentAt))",
+            "\(copy.locationLabel): \(location)",
+            "\(copy.reasonLabel): \(violation)"
         ]
         if !report.licensePlate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            factLines.append("Kennzeichen: \(report.licensePlate)")
+            factLines.append("\(copy.licensePlateLabel): \(report.licensePlate)")
         }
         let boxHeight = CGFloat(factLines.count) * 15 + 20
         let boxRect = CGRect(x: margin, y: y, width: contentWidth, height: boxHeight)
@@ -417,10 +463,10 @@ enum PDFReportRenderer {
         )
         y = boxRect.maxY + 17
 
-        let trimmedNotes = report.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedNotes.isEmpty {
             y = drawText(
-                "Kurzbeschreibung",
+                copy.summaryTitle,
                 at: y,
                 width: contentWidth,
                 font: .boldSystemFont(ofSize: 9),
@@ -438,13 +484,13 @@ enum PDFReportRenderer {
         }
 
         let responseSentence = report.wantsManagementResponse
-            ? "Ich ersuche um eine kurze Rückmeldung zum Ergebnis der Prüfung beziehungsweise zum weiteren Vorgehen."
-            : "Eine gesonderte Rückmeldung der Hausverwaltung ist nicht erforderlich."
+            ? copy.responseRequested
+            : copy.responseNotRequired
         let disclosureSentence = report.permitsNameDisclosure
-            ? "Mein Name darf der verursachenden Person mitgeteilt werden."
-            : "Ich ersuche darum, meinen Namen gegenüber der verursachenden Person nicht offenzulegen."
+            ? copy.disclosureAllowed
+            : copy.disclosureDenied
         y = drawText(
-            "Rückmeldung und Vertraulichkeit",
+            copy.responseTitle,
             at: y,
             width: contentWidth,
             font: .boldSystemFont(ofSize: 9),
@@ -462,8 +508,8 @@ enum PDFReportRenderer {
 
         if !attachmentTitles.isEmpty {
             let attachmentSentence = technicalAttachmentMode == .json
-                ? "Die Beweisfotos finden Sie im PDF. Technische Daten sind zusätzlich als maschinenlesbare JSON-Datei beigefügt."
-                : "Die zugehörigen Beweisfotos und gegebenenfalls die technische Dokumentation finden Sie in den Anlagen."
+                ? copy.jsonAttachmentSentence
+                : copy.attachmentSentence
             y = drawText(
                 attachmentSentence,
                 at: y,
@@ -475,7 +521,7 @@ enum PDFReportRenderer {
         }
 
         y = drawText(
-            "Mit freundlichen Grüßen\n\n\(profile.fullName)",
+            "\(copy.closing)\n\n\(profile.fullName)",
             at: y,
             width: contentWidth,
             font: .systemFont(ofSize: 11),
@@ -485,7 +531,7 @@ enum PDFReportRenderer {
 
         if !attachmentTitles.isEmpty {
             _ = drawText(
-                "Anlagen\n" + attachmentTitles.joined(separator: "\n"),
+                "\(copy.attachmentsTitle)\n" + attachmentTitles.map(copy.localizeAttachmentTitle).joined(separator: "\n"),
                 at: y,
                 width: contentWidth,
                 font: .systemFont(ofSize: 9.5),
@@ -740,26 +786,39 @@ enum PDFReportRenderer {
         return formatter
     }()
 
-    private static let letterDateFormatter: DateFormatter = {
+    private static func dateFormatter(for language: LetterLanguage) -> DateFormatter {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "de_AT")
+        formatter.locale = Locale(identifier: language.localeIdentifier)
         formatter.dateStyle = .long
-        formatter.timeStyle = .none
+        formatter.timeStyle = .medium
         formatter.timeZone = .autoupdatingCurrent
         return formatter
-    }()
+    }
+
+    private static func letterDateFormatter(for language: LetterLanguage) -> DateFormatter {
+        let formatter = dateFormatter(for: language)
+        formatter.timeStyle = .none
+        return formatter
+    }
 
     private static func reportScope(for report: IncidentReport, property: ManagedProperty) -> String {
         if report.isCommonArea { return "Allgemeinfläche" }
         return property.occupancyRole == .tenant ? "Gemietetes Objekt" : "Objekt im Eigentum"
     }
 
-    private static func reportSubject(_ report: IncidentReport, property: ManagedProperty) -> String {
-        var details = [report.garageLocation.trimmingCharacters(in: .whitespacesAndNewlines)]
+    private static func reportSubject(
+        _ report: IncidentReport,
+        property: ManagedProperty,
+        language: LetterLanguage,
+        violation: String,
+        location: String
+    ) -> String {
+        let copy = LetterCopy(language: language)
+        var details = [location.trimmingCharacters(in: .whitespacesAndNewlines)]
             .filter { !$0.isEmpty }
         let plate = report.licensePlate.trimmingCharacters(in: .whitespacesAndNewlines)
         if !plate.isEmpty {
-            details.append("Kennzeichen \(plate)")
+            details.append("\(copy.licensePlateLabel) \(plate)")
         }
         if details.isEmpty {
             let summary = report.notes
@@ -769,8 +828,8 @@ enum PDFReportRenderer {
                 details.append(String(summary.prefix(70)))
             }
         }
-        let detailText = details.isEmpty ? "Details siehe Anlage 1" : details.joined(separator: ", ")
-        return "\(property.officialDisplayName) - \(report.violation) - \(detailText)"
+        let detailText = details.isEmpty ? copy.detailsInAttachment : details.joined(separator: ", ")
+        return "\(property.officialDisplayName) - \(violation) - \(detailText)"
     }
 
     private static let percentFormatter: NumberFormatter = {
@@ -786,6 +845,118 @@ enum PDFReportRenderer {
             return value
         }
         return "\(value) (Konfidenz \(formatted))"
+    }
+}
+
+private struct LetterCopy {
+    let language: LetterLanguage
+
+    var documentTitle: String { value("MELDUNG", "SEGNALAZIONE", "REPORT") }
+    var defaultRecipient: String { value("An die zuständige Hausverwaltung", "All'amministrazione condominiale competente", "To the responsible property management") }
+    var byEmail: String { value("per E-Mail", "via e-mail", "by email") }
+    var salutation: String { value("Sehr geehrte Damen und Herren,", "Gentili Signore e Signori,", "Dear Sir or Madam,") }
+    var translationNotice: String { value(
+        "KI-übersetzt. Verbindlich ist die deutsche Originalfassung.",
+        "Traduzione automatica tramite IA. Fa fede la versione originale in tedesco.",
+        "AI-translated. The binding version is the German original."
+    ) }
+    var objectLabel: String { value("Objekt", "Immobile", "Property") }
+    var objectTypeLabel: String { value("Objekttyp", "Tipo di immobile", "Property type") }
+    var objectAddressLabel: String { value("Objektanschrift", "Indirizzo dell'immobile", "Property address") }
+    var observedLabel: String { value("Beobachtet", "Osservato il", "Observed") }
+    var locationLabel: String { value("Bereich", "Area", "Location") }
+    var reasonLabel: String { value("Meldegrund", "Motivo della segnalazione", "Reason for report") }
+    var licensePlateLabel: String { value("Kennzeichen", "Targa", "Registration plate") }
+    var summaryTitle: String { value("Kurzbeschreibung", "Breve descrizione", "Summary") }
+    var responseTitle: String { value("Rückmeldung und Vertraulichkeit", "Riscontro e riservatezza", "Response and confidentiality") }
+    var responseRequested: String { value(
+        "Ich ersuche um eine kurze Rückmeldung zum Ergebnis der Prüfung beziehungsweise zum weiteren Vorgehen.",
+        "Chiedo un breve riscontro sull'esito della verifica e sulle eventuali misure successive.",
+        "I kindly request a brief response regarding the outcome of the review and any further action."
+    ) }
+    var responseNotRequired: String { value(
+        "Eine gesonderte Rückmeldung der Hausverwaltung ist nicht erforderlich.",
+        "Non è necessario un riscontro separato da parte dell'amministrazione.",
+        "A separate response from the property management is not required."
+    ) }
+    var disclosureAllowed: String { value(
+        "Mein Name darf der verursachenden Person mitgeteilt werden.",
+        "Il mio nome può essere comunicato alla persona responsabile.",
+        "My name may be disclosed to the person responsible."
+    ) }
+    var disclosureDenied: String { value(
+        "Ich ersuche darum, meinen Namen gegenüber der verursachenden Person nicht offenzulegen.",
+        "Chiedo che il mio nome non venga comunicato alla persona responsabile.",
+        "Please do not disclose my name to the person responsible."
+    ) }
+    var jsonAttachmentSentence: String { value(
+        "Die Beweisfotos finden Sie im PDF. Technische Daten sind zusätzlich als maschinenlesbare JSON-Datei beigefügt.",
+        "Le fotografie probatorie sono incluse nel PDF. I dati tecnici sono inoltre allegati in un file JSON leggibile da sistemi informatici.",
+        "The evidence photographs are included in the PDF. Technical data is also attached as a machine-readable JSON file."
+    ) }
+    var attachmentSentence: String { value(
+        "Die zugehörigen Beweisfotos und gegebenenfalls die technische Dokumentation finden Sie in den Anlagen.",
+        "Le relative fotografie probatorie e, se previsto, la documentazione tecnica sono riportate negli allegati.",
+        "The related evidence photographs and, where applicable, the technical documentation are included in the attachments."
+    ) }
+    var closing: String { value("Mit freundlichen Grüßen", "Cordiali saluti", "Yours faithfully") }
+    var attachmentsTitle: String { value("Anlagen", "Allegati", "Attachments") }
+    var detailsInAttachment: String { value("Details siehe Anlage 1", "Dettagli nell'allegato 1", "See attachment 1 for details") }
+
+    func introduction(isCommonArea: Bool, occupancyRole: OccupancyRole) -> String {
+        switch language {
+        case .german:
+            let scope = isCommonArea
+                ? "auf einer Allgemeinfläche des unten genannten Objekts"
+                : (occupancyRole == .tenant ? "in meinem gemieteten Objekt" : "in meinem Eigentumsobjekt")
+            return "Hiermit informiere ich Sie über einen dokumentierten Vorfall \(scope). Ich ersuche um Prüfung und gegebenenfalls um die erforderlichen Maßnahmen."
+        case .italian:
+            let scope = isCommonArea
+                ? "in un'area comune dell'immobile indicato di seguito"
+                : (occupancyRole == .tenant ? "nell'immobile da me condotto in locazione" : "nel mio immobile di proprietà")
+            return "Con la presente segnalo un episodio documentato \(scope). Chiedo una verifica e, se necessario, l'adozione delle misure opportune."
+        case .english:
+            let scope = isCommonArea
+                ? "in a common area of the property stated below"
+                : (occupancyRole == .tenant ? "in the property I rent" : "in my owned property")
+            return "I hereby report a documented incident \(scope). Please review the matter and take any action considered necessary."
+        }
+    }
+
+    func propertyType(_ type: PropertyType) -> String {
+        switch (language, type) {
+        case (.german, _): type.rawValue
+        case (.italian, .apartment): "Appartamento"
+        case (.italian, .garage): "Garage"
+        case (.italian, .commercialSpace): "Locale commerciale"
+        case (.italian, .basement): "Cantina"
+        case (.italian, .storage): "Deposito"
+        case (.italian, .other): "Altro"
+        case (.english, .apartment): "Apartment"
+        case (.english, .garage): "Garage"
+        case (.english, .commercialSpace): "Commercial premises"
+        case (.english, .basement): "Basement"
+        case (.english, .storage): "Storage"
+        case (.english, .other): "Other"
+        }
+    }
+
+    func localizeAttachmentTitle(_ title: String) -> String {
+        guard language != .german else { return title }
+        let replacements: [(String, String)] = language == .italian
+            ? [("Beweisfotos", "fotografie probatorie"), ("Beweisfoto", "fotografia probatoria"), ("Technische Dokumentation", "Documentazione tecnica"), ("Technische Daten", "Dati tecnici"), ("separate JSON-Datei", "file JSON separato")]
+            : [("Beweisfotos", "evidence photographs"), ("Beweisfoto", "evidence photograph"), ("Technische Dokumentation", "Technical documentation"), ("Technische Daten", "Technical data"), ("separate JSON-Datei", "separate JSON file")]
+        return replacements.reduce(title) { result, item in
+            result.replacingOccurrences(of: item.0, with: item.1)
+        }
+    }
+
+    private func value(_ german: String, _ italian: String, _ english: String) -> String {
+        switch language {
+        case .german: german
+        case .italian: italian
+        case .english: english
+        }
     }
 }
 

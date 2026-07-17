@@ -2,7 +2,7 @@ name: HVMeldeApp
 options:
   bundleIdPrefix: at.zetik
   deploymentTarget:
-    iOS: "17.0"
+    iOS: "26.0"
 packages:
   HVMeldeCore:
     path: .

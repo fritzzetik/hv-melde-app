@@ -27,6 +27,8 @@ Für die lokale Bilderkennung wählt die Nutzerin oder der Nutzer eine feste Mel
 
 Optional kann in den Einstellungen die erweiterte lokale Analyse aktiviert werden. Auf kompatiblen Geräten formuliert das Apple-Intelligence-Modell aus den lokalen Vision-Ergebnissen einen sachlichen Beschreibungsvorschlag. Ist das Modell nicht verfügbar, verwendet die App automatisch ausschließlich die bestehende Vision-Erkennung. Es werden keine Fotos oder Analysedaten an OpenAI oder andere externe Anbieter übertragen.
 
+Die Oberfläche ist auf Deutsch, Italienisch und Englisch verfügbar. Pro Hausverwaltung kann eine deutsche, italienische, englische oder deutsch-italienische Briefausgabe gewählt werden. Freitextfelder werden für fremdsprachige Briefe mit Apples lokalem Translation Framework vorübersetzt und können vor der PDF-Erstellung korrigiert werden. Automatisch übersetzte Briefseiten weisen darauf hin, dass die deutsche Originalfassung verbindlich ist. Die App setzt dafür iOS 26 oder neuer voraus.
+
 Das der App übergebene Originalbild wird unverändert im geschützten App-Verzeichnis abgelegt. Das PDF enthält das Bild, dessen vollständige SHA-256-Prüfsumme, Importzeitpunkt, verfügbare EXIF-Aufnahmezeit samt Zeitzonenhinweis und die bestätigte lokale Auswertung. Der fachliche Umfang steht in [docs/MVP.md](docs/MVP.md), die Leitlinien zum Beweiswert in [docs/EVIDENCE.md](docs/EVIDENCE.md).
 
 ## Technische Struktur
@@ -50,7 +52,7 @@ Das der App übergebene Originalbild wird unverändert im geschützten App-Verze
 
 ## Lokale Entwicklung
 
-Voraussetzungen auf macOS: aktuelles Xcode, Swift und XcodeGen.
+Voraussetzungen auf macOS: aktuelles Xcode, Swift und XcodeGen. Das App-Ziel benötigt iOS 26 oder neuer.
 
 ```sh
 swift test
