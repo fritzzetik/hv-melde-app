@@ -657,7 +657,7 @@ private struct TranslationReviewView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Übersetzte Angaben prüfen") {
+                Section {
                     TextField("Bereich oder Ort im Objekt", text: $translation.location)
                     TextField("Meldegrund", text: $translation.violation)
                     TextField("Sachliche Beschreibung", text: $translation.notes, axis: .vertical)
@@ -668,6 +668,8 @@ private struct TranslationReviewView: View {
                     if !translation.witnesses.isEmpty {
                         TextField("Zeugen", text: $translation.witnesses)
                     }
+                } header: {
+                    Text("Übersetzte Angaben prüfen")
                 } footer: {
                     Text("Du kannst die lokale Übersetzung vor der PDF-Erstellung korrigieren. Die Zielsprachenseite bleibt als KI-übersetzt gekennzeichnet; verbindlich ist die deutsche Originalfassung.")
                 }
