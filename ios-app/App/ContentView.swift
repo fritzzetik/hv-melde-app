@@ -84,6 +84,7 @@ private struct NewReportView: View {
     @State private var requestsManagementResponse = true
     @State private var allowsNameDisclosure = false
     @State private var evidencePhotos: [EvidencePhoto] = []
+    @State private var analysisReviewTarget: ImageAnalysisReviewTarget?
     @State private var generatedPDF: URL?
     @State private var generatedTechnicalJSON: URL?
     @State private var mailDraft: MailDraft?
@@ -117,9 +118,7 @@ private struct NewReportView: View {
                         reportID: reportID,
                         category: category,
                         evidencePhotos: $evidencePhotos,
-                        licensePlate: $licensePlate,
-                        vehicleDescription: $vehicleDescription,
-                        notes: $notes
+                        reviewTarget: $analysisReviewTarget
                     )
                     .id(reportID)
                 case .review:
@@ -166,7 +165,12 @@ private struct NewReportView: View {
             }
             .onChange(of: store.state.properties) { _, _ in selectFirstPropertyIfNeeded() }
             .onChange(of: selectedPropertyID) { _, _ in generatedPDF = nil }
-            .onChange(of: evidencePhotos.map(\.id)) { _, _ in generatedPDF = nil }
+            .onChange(of: evidencePhotos.map(\.id)) { previousIDs, _ in
+                generatedPDF = nil
+                guard previousIDs.isEmpty,
+                      let capturedAt = evidencePhotos.first?.imageTimestamp.capturedAt else { return }
+                incidentAt = capturedAt
+            }
             .onChange(of: store.state.preferences.technicalAttachmentMode) { _, _ in
                 generatedPDF = nil
                 generatedTechnicalJSON = nil
@@ -178,6 +182,21 @@ private struct NewReportView: View {
             }
             .sheet(item: $mailDraft) { draft in
                 MailComposerView(draft: draft)
+            }
+            .sheet(item: $analysisReviewTarget) { target in
+                ImageAnalysisReviewView(
+                    analysis: target.analysis,
+                    currentLicensePlate: licensePlate,
+                    currentVehicleDescription: vehicleDescription
+                ) { confirmedPlate, confirmedVehicle, confirmedSummary in
+                    applyAnalysisConfirmation(
+                        target.analysis,
+                        photoID: target.photoID,
+                        plate: confirmedPlate,
+                        vehicle: confirmedVehicle,
+                        summary: confirmedSummary
+                    )
+                }
             }
             .sheet(isPresented: $showsTranslationReview, onDismiss: {
                 if translatedTextReview != nil { isGeneratingPDF = false }
@@ -537,6 +556,7 @@ private struct NewReportView: View {
         requestsManagementResponse = true
         allowsNameDisclosure = false
         evidencePhotos = []
+        analysisReviewTarget = nil
         generatedPDF = nil
         generatedTechnicalJSON = nil
         mailDraft = nil
@@ -546,6 +566,50 @@ private struct NewReportView: View {
         store.clearDraft()
         hasUnsavedDraft = false
         currentStep = .object
+    }
+
+    private func applyAnalysisConfirmation(
+        _ result: LocalImageAnalysis,
+        photoID: UUID,
+        plate: String,
+        vehicle: String,
+        summary: String
+    ) {
+        if !plate.isEmpty { licensePlate = plate }
+        if !vehicle.isEmpty { vehicleDescription = vehicle }
+        if notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            notes = summary
+        }
+
+        guard let index = evidencePhotos.firstIndex(where: { $0.id == photoID }) else { return }
+        var photo = evidencePhotos[index]
+        photo.confirmedAnalysis = ConfirmedImageAnalysis(
+            category: result.category,
+            vehicleDetected: result.vehicle.detected,
+            vehicleConfidence: result.vehicle.confidence,
+            suggestedVehicleType: result.category.expectsVehicle ? result.vehicleType?.name : nil,
+            suggestedVehicleTypeConfidence: result.category.expectsVehicle ? result.vehicleType?.confidence : nil,
+            suggestedVehicleColor: result.category.expectsVehicle ? result.vehicleColor?.name : nil,
+            suggestedVehicleColorConfidence: result.category.expectsVehicle ? result.vehicleColor?.confidence : nil,
+            suggestedSceneObjects: result.relevantObjects.map {
+                ImageAnalysisObjectRecord(name: $0.name, confidence: $0.confidence)
+            },
+            confirmedLicensePlate: plate,
+            confirmedVehicleDescription: vehicle,
+            confirmedSceneSummary: summary,
+            analyzedAt: Date(),
+            analyzerDescription: result.localIntelligenceOutcome == .applied
+                ? "Apple Vision mit lokaler Apple-Intelligence-Formulierung; heuristische Farbauswertung"
+                : "Apple Vision: Bildklassifizierung, Texterkennung und Salienz; lokale heuristische Farbauswertung"
+        )
+        evidencePhotos[index] = photo
+        Task {
+            do {
+                try await EvidencePhotoStore.updateMetadata(for: photo)
+            } catch {
+                await MainActor.run { errorMessage = error.localizedDescription }
+            }
+        }
     }
 
     private func cancelDraft() {

@@ -10,14 +10,10 @@ struct PhotoAnalysisSection: View {
     let reportID: UUID
     let category: ReportCategory
     @Binding var evidencePhotos: [EvidencePhoto]
-    @Binding var licensePlate: String
-    @Binding var vehicleDescription: String
-    @Binding var notes: String
+    @Binding var reviewTarget: ImageAnalysisReviewTarget?
 
     @State private var selectedItem: PhotosPickerItem?
     @State private var photoPickerIdentity = UUID()
-    @State private var reviewTarget: ImageAnalysisReviewTarget?
-    @State private var showsAnalysisReview = false
     @State private var analysisResults: [UUID: LocalImageAnalysis] = [:]
     @State private var analyzingPhotoID: UUID?
     @State private var isAnalyzing = false
@@ -115,7 +111,7 @@ struct PhotoAnalysisSection: View {
 
                     if let result = analysisResults[photo.id] {
                         Button {
-                            presentReview(for: photo, analysis: result)
+                            reviewTarget = ImageAnalysisReviewTarget(photoID: photo.id, analysis: result)
                         } label: {
                             Label("Erkannte Werte prüfen und übernehmen", systemImage: "checkmark.circle")
                         }
@@ -148,7 +144,6 @@ struct PhotoAnalysisSection: View {
             resetForNewReport()
         }
         .onChange(of: category) { _, _ in
-            showsAnalysisReview = false
             reviewTarget = nil
             analysisResults = [:]
         }
@@ -160,27 +155,6 @@ struct PhotoAnalysisSection: View {
                 showsCamera = false
             }
             .ignoresSafeArea()
-        }
-        .sheet(isPresented: $showsAnalysisReview, onDismiss: {
-            reviewTarget = nil
-        }) {
-            if let target = reviewTarget {
-                ImageAnalysisReviewView(
-                    analysis: target.analysis,
-                    currentLicensePlate: licensePlate,
-                    currentVehicleDescription: vehicleDescription
-                ) { confirmedPlate, confirmedVehicle, confirmedSummary in
-                    applyConfirmation(
-                        target.analysis,
-                        photoID: target.photoID,
-                        plate: confirmedPlate,
-                        vehicle: confirmedVehicle,
-                        summary: confirmedSummary
-                    )
-                }
-            } else {
-                ProgressView()
-            }
         }
         .alert("Bildverarbeitung fehlgeschlagen", isPresented: errorIsPresented) {
             Button("OK", role: .cancel) {}
@@ -195,7 +169,6 @@ struct PhotoAnalysisSection: View {
         importTask = nil
         selectedItem = nil
         photoPickerIdentity = UUID()
-        showsAnalysisReview = false
         reviewTarget = nil
         analysisResults = [:]
         analyzingPhotoID = nil
@@ -203,15 +176,6 @@ struct PhotoAnalysisSection: View {
         isImporting = false
         showsCamera = false
         errorMessage = nil
-    }
-
-    private func presentReview(for photo: EvidencePhoto, analysis: LocalImageAnalysis) {
-        reviewTarget = ImageAnalysisReviewTarget(photoID: photo.id, analysis: analysis)
-        Task { @MainActor in
-            try? await Task<Never, Never>.sleep(for: .milliseconds(50))
-            guard reviewTarget?.photoID == photo.id else { return }
-            showsAnalysisReview = true
-        }
     }
 
     @ViewBuilder
@@ -299,7 +263,6 @@ struct PhotoAnalysisSection: View {
             fileExtension: fileExtension
         )
         evidencePhotos.append(evidencePhoto)
-        showsAnalysisReview = false
         reviewTarget = nil
         errorMessage = nil
     }
@@ -331,50 +294,6 @@ struct PhotoAnalysisSection: View {
         }
     }
 
-    private func applyConfirmation(
-        _ result: LocalImageAnalysis,
-        photoID: UUID,
-        plate: String,
-        vehicle: String,
-        summary: String
-    ) {
-        if !plate.isEmpty { licensePlate = plate }
-        if !vehicle.isEmpty { vehicleDescription = vehicle }
-        if notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            notes = summary
-        }
-
-        guard let index = evidencePhotos.firstIndex(where: { $0.id == photoID }) else { return }
-        var photo = evidencePhotos[index]
-        photo.confirmedAnalysis = ConfirmedImageAnalysis(
-            category: result.category,
-            vehicleDetected: result.vehicle.detected,
-            vehicleConfidence: result.vehicle.confidence,
-            suggestedVehicleType: result.category.expectsVehicle ? result.vehicleType?.name : nil,
-            suggestedVehicleTypeConfidence: result.category.expectsVehicle ? result.vehicleType?.confidence : nil,
-            suggestedVehicleColor: result.category.expectsVehicle ? result.vehicleColor?.name : nil,
-            suggestedVehicleColorConfidence: result.category.expectsVehicle ? result.vehicleColor?.confidence : nil,
-            suggestedSceneObjects: result.relevantObjects.map {
-                ImageAnalysisObjectRecord(name: $0.name, confidence: $0.confidence)
-            },
-            confirmedLicensePlate: plate,
-            confirmedVehicleDescription: vehicle,
-            confirmedSceneSummary: summary,
-            analyzedAt: Date(),
-            analyzerDescription: result.localIntelligenceOutcome == .applied
-                ? "Apple Vision mit lokaler Apple-Intelligence-Formulierung; heuristische Farbauswertung"
-                : "Apple Vision: Bildklassifizierung, Texterkennung und Salienz; lokale heuristische Farbauswertung"
-        )
-        evidencePhotos[index] = photo
-        Task {
-            do {
-                try await EvidencePhotoStore.updateMetadata(for: photo)
-            } catch {
-                await MainActor.run { errorMessage = error.localizedDescription }
-            }
-        }
-    }
-
     private func remove(_ photo: EvidencePhoto) {
         Task {
             do {
@@ -383,7 +302,6 @@ struct PhotoAnalysisSection: View {
                     evidencePhotos.removeAll { $0.id == photo.id }
                     analysisResults[photo.id] = nil
                     if reviewTarget?.photoID == photo.id {
-                        showsAnalysisReview = false
                         reviewTarget = nil
                     }
                 }
@@ -394,7 +312,7 @@ struct PhotoAnalysisSection: View {
     }
 }
 
-private struct ImageAnalysisReviewTarget: Identifiable {
+struct ImageAnalysisReviewTarget: Identifiable {
     let photoID: UUID
     let analysis: LocalImageAnalysis
     var id: UUID { analysis.id }
@@ -408,7 +326,7 @@ private enum PhotoAnalysisError: LocalizedError {
     }
 }
 
-private struct ImageAnalysisReviewView: View {
+struct ImageAnalysisReviewView: View {
     @Environment(\.dismiss) private var dismiss
     let analysis: LocalImageAnalysis
     let onConfirm: (String, String, String) -> Void
