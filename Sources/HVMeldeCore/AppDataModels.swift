@@ -235,6 +235,216 @@ public enum ReportedCaseStatus: String, CaseIterable, Codable, Identifiable, Sen
     public var id: String { rawValue }
 }
 
+public enum NoiseProtocolStatus: String, CaseIterable, Codable, Identifiable, Sendable {
+    case open = "Laufend"
+    case completed = "Abgeschlossen"
+
+    public var id: String { rawValue }
+}
+
+public enum NoiseTimelineEntryKind: String, CaseIterable, Codable, Identifiable, Sendable {
+    case disturbance = "Ruhestörung"
+    case intervention = "Einsatz oder Maßnahme"
+
+    public var id: String { rawValue }
+}
+
+public enum NoiseEvidenceKind: String, Codable, Sendable {
+    case video
+    case photo
+    case document
+}
+
+public struct NoiseEvidenceFile: Codable, Equatable, Identifiable, Sendable {
+    public let id: UUID
+    public let entryID: UUID
+    public let kind: NoiseEvidenceKind
+    public let originalFileName: String
+    public let storedFileName: String
+    public let sha256: String
+    public let capturedAt: Date?
+    public let importedAt: Date
+    public let durationSeconds: Double?
+    public let byteCount: Int64
+
+    public init(
+        id: UUID = UUID(),
+        entryID: UUID,
+        kind: NoiseEvidenceKind,
+        originalFileName: String,
+        storedFileName: String,
+        sha256: String,
+        capturedAt: Date? = nil,
+        importedAt: Date = Date(),
+        durationSeconds: Double? = nil,
+        byteCount: Int64
+    ) {
+        self.id = id
+        self.entryID = entryID
+        self.kind = kind
+        self.originalFileName = originalFileName
+        self.storedFileName = storedFileName
+        self.sha256 = sha256
+        self.capturedAt = capturedAt
+        self.importedAt = importedAt
+        self.durationSeconds = durationSeconds
+        self.byteCount = byteCount
+    }
+}
+
+public struct NoiseTimelineEntry: Codable, Equatable, Identifiable, Sendable {
+    public let id: UUID
+    public let createdAt: Date
+    public var updatedAt: Date
+    public let kind: NoiseTimelineEntryKind
+    public var startedAt: Date
+    public var endedAt: Date?
+    public var noiseType: String
+    public var sourceLocation: String
+    public var perceivedLocation: String
+    public var impact: String
+    public var details: String
+    public var witnesses: String
+    public var notifiedAt: Date?
+    public var arrivedAt: Date?
+    public var departedAt: Date?
+    public var responderType: String
+    public var stationOrUnit: String
+    public var officers: String
+    public var referenceNumber: String
+    public var outcome: String
+    public var evidenceFiles: [NoiseEvidenceFile]
+
+    public init(
+        id: UUID = UUID(),
+        createdAt: Date = Date(),
+        updatedAt: Date = Date(),
+        kind: NoiseTimelineEntryKind,
+        startedAt: Date,
+        endedAt: Date? = nil,
+        noiseType: String = "",
+        sourceLocation: String = "",
+        perceivedLocation: String = "",
+        impact: String = "",
+        details: String = "",
+        witnesses: String = "",
+        notifiedAt: Date? = nil,
+        arrivedAt: Date? = nil,
+        departedAt: Date? = nil,
+        responderType: String = "",
+        stationOrUnit: String = "",
+        officers: String = "",
+        referenceNumber: String = "",
+        outcome: String = "",
+        evidenceFiles: [NoiseEvidenceFile] = []
+    ) {
+        self.id = id
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.kind = kind
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.noiseType = noiseType
+        self.sourceLocation = sourceLocation
+        self.perceivedLocation = perceivedLocation
+        self.impact = impact
+        self.details = details
+        self.witnesses = witnesses
+        self.notifiedAt = notifiedAt
+        self.arrivedAt = arrivedAt
+        self.departedAt = departedAt
+        self.responderType = responderType
+        self.stationOrUnit = stationOrUnit
+        self.officers = officers
+        self.referenceNumber = referenceNumber
+        self.outcome = outcome
+        self.evidenceFiles = evidenceFiles
+    }
+
+    public var duration: TimeInterval? {
+        endedAt.map { max(0, $0.timeIntervalSince(startedAt)) }
+    }
+}
+
+public struct NoiseProtocol: Codable, Equatable, Identifiable, Sendable {
+    public let id: UUID
+    public let createdAt: Date
+    public var updatedAt: Date
+    public let propertyID: UUID
+    public let propertyName: String
+    public let officialPropertyName: String
+    public let propertyAddress: PostalAddress
+    public let occupancyRole: OccupancyRole
+    public var title: String
+    public var suspectedSource: String
+    public var isCommonArea: Bool
+    public var status: NoiseProtocolStatus
+    public var completedAt: Date?
+    public var requestsManagementResponse: Bool
+    public var allowsNameDisclosure: Bool
+    public var entries: [NoiseTimelineEntry]
+
+    public init(
+        id: UUID = UUID(),
+        createdAt: Date = Date(),
+        updatedAt: Date = Date(),
+        propertyID: UUID,
+        propertyName: String,
+        officialPropertyName: String,
+        propertyAddress: PostalAddress,
+        occupancyRole: OccupancyRole,
+        title: String = "Lärmprotokoll",
+        suspectedSource: String = "",
+        isCommonArea: Bool = false,
+        status: NoiseProtocolStatus = .open,
+        completedAt: Date? = nil,
+        requestsManagementResponse: Bool = true,
+        allowsNameDisclosure: Bool = false,
+        entries: [NoiseTimelineEntry] = []
+    ) {
+        self.id = id
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.propertyID = propertyID
+        self.propertyName = propertyName
+        self.officialPropertyName = officialPropertyName
+        self.propertyAddress = propertyAddress
+        self.occupancyRole = occupancyRole
+        self.title = title
+        self.suspectedSource = suspectedSource
+        self.isCommonArea = isCommonArea
+        self.status = status
+        self.completedAt = completedAt
+        self.requestsManagementResponse = requestsManagementResponse
+        self.allowsNameDisclosure = allowsNameDisclosure
+        self.entries = entries
+    }
+
+    public var recipientPropertyName: String {
+        officialPropertyName.trimmed.isEmpty ? propertyName : officialPropertyName
+    }
+
+    public var disturbanceCount: Int {
+        entries.filter { $0.kind == .disturbance }.count
+    }
+
+    public var interventionCount: Int {
+        entries.filter { $0.kind == .intervention }.count
+    }
+
+    public var evidenceFileCount: Int {
+        entries.reduce(0) { $0 + $1.evidenceFiles.count }
+    }
+
+    public var firstEventAt: Date? {
+        entries.map(\.startedAt).min()
+    }
+
+    public var lastEventAt: Date? {
+        entries.map { $0.endedAt ?? $0.startedAt }.max()
+    }
+}
+
 public enum CloudCaseFileKind: String, Codable, Sendable {
     case pdf
     case photo
@@ -384,6 +594,7 @@ public struct AppDataState: Codable, Equatable, Sendable {
     public var preferences: AppPreferences
     public var deletedCases: [DeletedCaseTombstone]
     public var deletedCloudFileRecordNames: [String]
+    public var noiseProtocols: [NoiseProtocol]
 
     public init(
         profile: UserProfile = UserProfile(),
@@ -393,7 +604,8 @@ public struct AppDataState: Codable, Equatable, Sendable {
         reportCategories: [ReportCategory] = ReportCategory.defaultCategories,
         preferences: AppPreferences = AppPreferences(),
         deletedCases: [DeletedCaseTombstone] = [],
-        deletedCloudFileRecordNames: [String] = []
+        deletedCloudFileRecordNames: [String] = [],
+        noiseProtocols: [NoiseProtocol] = []
     ) {
         self.profile = profile
         self.properties = properties
@@ -403,11 +615,12 @@ public struct AppDataState: Codable, Equatable, Sendable {
         self.preferences = preferences
         self.deletedCases = deletedCases
         self.deletedCloudFileRecordNames = deletedCloudFileRecordNames
+        self.noiseProtocols = noiseProtocols
     }
 
     private enum CodingKeys: String, CodingKey {
         case profile, properties, propertyManagements, reportedCases, reportCategories, preferences
-        case deletedCases, deletedCloudFileRecordNames
+        case deletedCases, deletedCloudFileRecordNames, noiseProtocols
     }
 
     public init(from decoder: Decoder) throws {
@@ -421,6 +634,7 @@ public struct AppDataState: Codable, Equatable, Sendable {
         preferences = try container.decodeIfPresent(AppPreferences.self, forKey: .preferences) ?? AppPreferences()
         deletedCases = try container.decodeIfPresent([DeletedCaseTombstone].self, forKey: .deletedCases) ?? []
         deletedCloudFileRecordNames = try container.decodeIfPresent([String].self, forKey: .deletedCloudFileRecordNames) ?? []
+        noiseProtocols = try container.decodeIfPresent([NoiseProtocol].self, forKey: .noiseProtocols) ?? []
     }
 }
 

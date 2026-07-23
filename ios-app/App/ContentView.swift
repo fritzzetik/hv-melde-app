@@ -9,7 +9,7 @@ private enum AppTab: Hashable {
 
 struct ContentView: View {
     @EnvironmentObject private var store: AppDataStore
-    @AppStorage("hasCompletedOnboardingV1") private var hasCompletedOnboarding = false
+    @AppStorage("hasCompletedOnboardingV2") private var hasCompletedOnboarding = false
     @State private var selectedTab: AppTab = .home
     @State private var pendingTab: AppTab?
     @State private var showsLeaveWarning = false
@@ -34,7 +34,10 @@ struct ContentView: View {
 
             NavigationStack { ReportedCasesView() }
                 .tabItem { Label("Fälle", systemImage: "tray.full") }
-                .badge(store.state.reportedCases.filter { $0.status == .open }.count)
+                .badge(
+                    store.state.reportedCases.filter { $0.status == .open }.count
+                        + store.state.noiseProtocols.filter { $0.status == .open }.count
+                )
                 .tag(AppTab.cases)
 
             NavigationStack {

@@ -193,6 +193,76 @@ func oldAppDataMigratesWithDefaults() throws {
     #expect(decoded.preferences.technicalAttachmentMode == .none)
     #expect(decoded.deletedCases.isEmpty)
     #expect(decoded.deletedCloudFileRecordNames.isEmpty)
+    #expect(decoded.noiseProtocols.isEmpty)
+}
+
+@Test("Lärmprotokoll bewahrt Zeitleiste und Dateihashes")
+func noiseProtocolRoundTrip() throws {
+    let propertyID = UUID()
+    let entryID = UUID()
+    let evidence = NoiseEvidenceFile(
+        entryID: entryID,
+        kind: .video,
+        originalFileName: "IMG_1001.MOV",
+        storedFileName: "evidence.mov",
+        sha256: String(repeating: "a", count: 64),
+        capturedAt: Date(timeIntervalSince1970: 1_000),
+        importedAt: Date(timeIntervalSince1970: 1_100),
+        durationSeconds: 31.5,
+        byteCount: 1_234_567
+    )
+    let disturbance = NoiseTimelineEntry(
+        id: entryID,
+        kind: .disturbance,
+        startedAt: Date(timeIntervalSince1970: 900),
+        endedAt: Date(timeIntervalSince1970: 1_200),
+        noiseType: "Musik oder Bass",
+        sourceLocation: "Top 7",
+        perceivedLocation: "Schlafzimmer",
+        impact: "Aufgewacht",
+        evidenceFiles: [evidence]
+    )
+    let intervention = NoiseTimelineEntry(
+        kind: .intervention,
+        startedAt: Date(timeIntervalSince1970: 1_300),
+        responderType: "Polizei",
+        stationOrUnit: "Polizeiinspektion Muster",
+        officers: "Name, Dienstnummer 123",
+        referenceNumber: "AZ-42",
+        outcome: "Sachverhalt aufgenommen"
+    )
+    let noiseProtocol = NoiseProtocol(
+        propertyID: propertyID,
+        propertyName: "Wohnung Meran",
+        officialPropertyName: "Condominium Goethe",
+        propertyAddress: PostalAddress(city: "Meran", country: .italy),
+        occupancyRole: .owner,
+        suspectedSource: "Top 7",
+        entries: [disturbance, intervention]
+    )
+    let original = AppDataState(noiseProtocols: [noiseProtocol])
+
+    let decoded = try JSONDecoder().decode(AppDataState.self, from: JSONEncoder().encode(original))
+
+    #expect(decoded == original)
+    #expect(decoded.noiseProtocols.first?.disturbanceCount == 1)
+    #expect(decoded.noiseProtocols.first?.interventionCount == 1)
+    #expect(decoded.noiseProtocols.first?.evidenceFileCount == 1)
+    #expect(decoded.noiseProtocols.first?.recipientPropertyName == "Condominium Goethe")
+}
+
+@Test("Alte App-Daten erhalten eine leere Lärmprotokollliste")
+func oldAppDataDefaultsNoiseProtocols() throws {
+    let encoded = try JSONEncoder().encode(AppDataState())
+    var json = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    json.removeValue(forKey: "noiseProtocols")
+
+    let decoded = try JSONDecoder().decode(
+        AppDataState.self,
+        from: JSONSerialization.data(withJSONObject: json)
+    )
+
+    #expect(decoded.noiseProtocols.isEmpty)
 }
 
 @Test("Alte als Text gespeicherte Meldekategorie bleibt lesbar")

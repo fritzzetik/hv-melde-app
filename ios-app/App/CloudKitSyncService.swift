@@ -130,7 +130,7 @@ final class CloudKitSyncService {
     ) throws {
         record.encryptedValues["payload"] = try encoder.encode(state) as CKRecordValue
         record.encryptedValues["stateModifiedAt"] = modifiedAt as CKRecordValue
-        record.encryptedValues["schemaVersion"] = NSNumber(value: 4)
+        record.encryptedValues["schemaVersion"] = NSNumber(value: 5)
     }
 
     private func hasLocalContent(_ state: AppDataState) -> Bool {
@@ -138,6 +138,7 @@ final class CloudKitSyncService {
             || !state.properties.isEmpty
             || !state.propertyManagements.isEmpty
             || !state.reportedCases.isEmpty
+            || !state.noiseProtocols.isEmpty
             || state.reportCategories != ReportCategory.defaultCategories
             || state.preferences != AppPreferences()
     }
@@ -186,6 +187,15 @@ final class CloudKitSyncService {
             categories[category.id] = category
         }
 
+        var noiseProtocols = Dictionary(uniqueKeysWithValues: remote.noiseProtocols.map { ($0.id, $0) })
+        for noiseProtocol in local.noiseProtocols {
+            if let remoteProtocol = noiseProtocols[noiseProtocol.id],
+               remoteProtocol.updatedAt > noiseProtocol.updatedAt {
+                continue
+            }
+            noiseProtocols[noiseProtocol.id] = noiseProtocol
+        }
+
         let profile = local.profile.fullName.isEmpty ? remote.profile : local.profile
         return AppDataState(
             profile: profile,
@@ -198,7 +208,8 @@ final class CloudKitSyncService {
             },
             preferences: local.preferences,
             deletedCases: deletedCases.values.sorted { $0.deletedAt < $1.deletedAt },
-            deletedCloudFileRecordNames: deletedRecordNames.sorted()
+            deletedCloudFileRecordNames: deletedRecordNames.sorted(),
+            noiseProtocols: noiseProtocols.values.sorted { $0.updatedAt > $1.updatedAt }
         )
     }
 

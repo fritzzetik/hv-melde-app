@@ -7,6 +7,16 @@ struct ReportedCasesView: View {
 
     var body: some View {
         List {
+            Section {
+                NavigationLink {
+                    NoiseProtocolsView()
+                } label: {
+                    LabeledContent(
+                        "Lärmprotokolle",
+                        value: "\(store.state.noiseProtocols.filter { $0.status == .open }.count) laufend"
+                    )
+                }
+            }
             if store.state.reportedCases.isEmpty {
                 ContentUnavailableView(
                     "Noch keine Fälle",

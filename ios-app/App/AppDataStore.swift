@@ -161,6 +161,86 @@ final class AppDataStore: ObservableObject {
         return state.propertyManagements.first { $0.id == id }
     }
 
+    @discardableResult
+    func createNoiseProtocol(
+        property: ManagedProperty,
+        title: String,
+        suspectedSource: String,
+        isCommonArea: Bool,
+        requestsManagementResponse: Bool,
+        allowsNameDisclosure: Bool
+    ) -> UUID {
+        let noiseProtocol = NoiseProtocol(
+            propertyID: property.id,
+            propertyName: property.displayName,
+            officialPropertyName: property.officialName,
+            propertyAddress: property.address,
+            occupancyRole: property.occupancyRole,
+            title: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "Lärmprotokoll"
+                : title.trimmingCharacters(in: .whitespacesAndNewlines),
+            suspectedSource: suspectedSource.trimmingCharacters(in: .whitespacesAndNewlines),
+            isCommonArea: isCommonArea,
+            requestsManagementResponse: requestsManagementResponse,
+            allowsNameDisclosure: allowsNameDisclosure
+        )
+        state.noiseProtocols.append(noiseProtocol)
+        persist()
+        return noiseProtocol.id
+    }
+
+    func addNoiseEntry(_ entry: NoiseTimelineEntry, to protocolID: UUID) {
+        guard let index = state.noiseProtocols.firstIndex(where: { $0.id == protocolID }) else { return }
+        state.noiseProtocols[index].entries.append(entry)
+        state.noiseProtocols[index].entries.sort { $0.startedAt < $1.startedAt }
+        state.noiseProtocols[index].updatedAt = Date()
+        persist()
+    }
+
+    func finishNoiseDisturbance(
+        protocolID: UUID,
+        entryID: UUID,
+        at endedAt: Date = Date()
+    ) {
+        guard let protocolIndex = state.noiseProtocols.firstIndex(where: { $0.id == protocolID }),
+              let entryIndex = state.noiseProtocols[protocolIndex].entries.firstIndex(where: { $0.id == entryID }),
+              state.noiseProtocols[protocolIndex].entries[entryIndex].kind == .disturbance else {
+            return
+        }
+        let start = state.noiseProtocols[protocolIndex].entries[entryIndex].startedAt
+        state.noiseProtocols[protocolIndex].entries[entryIndex].endedAt = max(start, endedAt)
+        state.noiseProtocols[protocolIndex].entries[entryIndex].updatedAt = Date()
+        state.noiseProtocols[protocolIndex].updatedAt = Date()
+        persist()
+    }
+
+    func setNoiseProtocolStatus(_ status: NoiseProtocolStatus, for protocolID: UUID) {
+        guard let index = state.noiseProtocols.firstIndex(where: { $0.id == protocolID }) else { return }
+        state.noiseProtocols[index].status = status
+        state.noiseProtocols[index].completedAt = status == .completed ? Date() : nil
+        state.noiseProtocols[index].updatedAt = Date()
+        persist()
+    }
+
+    func deleteNoiseProtocol(_ protocolID: UUID) {
+        guard let index = state.noiseProtocols.firstIndex(where: { $0.id == protocolID }) else { return }
+        let previousState = state
+        state.noiseProtocols.remove(at: index)
+        do {
+            try persistState()
+            try NoiseEvidenceStore.removeProtocol(protocolID)
+            scheduleCloudSync()
+        } catch {
+            state = previousState
+            lastError = "Das Lärmprotokoll konnte nicht gelöscht werden: \(error.localizedDescription)"
+        }
+    }
+
+    func noiseEvidenceURL(for evidence: NoiseEvidenceFile, protocolID: UUID) -> URL? {
+        let url = NoiseEvidenceStore.localURL(for: evidence, protocolID: protocolID)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
     func saveReportedCase(
         report: IncidentReport,
         category: ReportCategory,

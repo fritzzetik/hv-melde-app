@@ -89,7 +89,7 @@ struct OnboardingView: View {
 }
 
 private enum OnboardingPage: String, CaseIterable, Identifiable {
-    case welcome, profile, management, property, report, privacy
+    case welcome, profile, management, property, report, noiseProtocol, privacy
 
     var id: String { rawValue }
 
@@ -100,6 +100,7 @@ private enum OnboardingPage: String, CaseIterable, Identifiable {
         case .management: "building.2"
         case .property: "house.and.flag"
         case .report: "camera.viewfinder"
+        case .noiseProtocol: "waveform.badge.plus"
         case .privacy: "lock.icloud"
         }
     }
@@ -111,6 +112,7 @@ private enum OnboardingPage: String, CaseIterable, Identifiable {
         case .management: "Hausverwaltung hinterlegen"
         case .property: "Objekte anlegen"
         case .report: "Einen Vorfall melden"
+        case .noiseProtocol: "Ruhestörungen länger dokumentieren"
         case .privacy: "Lokal und unter deiner Kontrolle"
         }
     }
@@ -122,6 +124,7 @@ private enum OnboardingPage: String, CaseIterable, Identifiable {
         case .management: "Eine Hausverwaltung kann mit mehreren Objekten verknüpft werden."
         case .property: "Lege jede Wohnung, Garage oder andere Einheit an, für die du Meldungen erstellen möchtest."
         case .report: "Fotos stehen am Anfang, damit lokale Erkennung und EXIF-Daten die Erfassung unterstützen."
+        case .noiseProtocol: "Ein Lärmprotokoll sammelt Vorfälle, Videos mit Ton und Einsätze über Wochen oder Monate in einer Zeitleiste."
         case .privacy: "Die App benötigt keinen zentralen Server und versendet nichts ohne deine Bestätigung."
         }
     }
@@ -138,6 +141,8 @@ private enum OnboardingPage: String, CaseIterable, Identifiable {
             ["Interner Name und offizielle Objektbezeichnung", "Straße, Nummer, Top und Objekttyp", "Mieter oder Eigentümer sowie zuständige Hausverwaltung"]
         case .report:
             ["Bis zu zehn Fotos auswählen oder aufnehmen", "Aufnahmedatum des ersten Fotos wird als Vorfallzeitpunkt verwendet", "Erkannte Angaben prüfen, PDF erstellen und versenden"]
+        case .noiseProtocol:
+            ["Beginn und Ende jeder Ruhestörung getrennt von der Videodauer erfassen", "Video mit Ton nur bewusst starten und unverändert mit SHA-256 sichern", "Polizei- oder andere Einsätze mit Dienststelle, Namen und Aktennummer dokumentieren", "PDF oder vollständiges Beweispaket über Mail Drop beziehungsweise iCloud Drive teilen"]
         case .privacy:
             ["Fotoanalyse und Übersetzung erfolgen auf dem Gerät", "iCloud-Synchronisierung ist optional und verwendet deinen privaten Bereich", "Erkennung und KI-Übersetzung bleiben prüfbare Vorschläge"]
         }

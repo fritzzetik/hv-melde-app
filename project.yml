@@ -30,7 +30,8 @@ targets:
         INFOPLIST_KEY_CFBundleIconName: AppIcon
         INFOPLIST_KEY_CFBundleDisplayName: HV Melde App
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
-        INFOPLIST_KEY_NSCameraUsageDescription: Die Kamera wird verwendet, um Beweisfotos für eine Meldung aufzunehmen. Fotos werden ausschließlich lokal verarbeitet.
+        INFOPLIST_KEY_NSCameraUsageDescription: Die Kamera wird verwendet, um Fotos und Videos als Beweismittel zu einem ausdrücklich erfassten Vorfall aufzunehmen.
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: Das Mikrofon wird nur während einer ausdrücklich gestarteten Videoaufnahme verwendet, um den Ton eines dokumentierten Vorfalls aufzunehmen.
         INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: Dein Standort wird nur auf deinen Wunsch erfasst, um den Ort der Meldung im PDF zu dokumentieren.
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait

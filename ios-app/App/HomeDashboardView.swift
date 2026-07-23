@@ -24,6 +24,14 @@ struct HomeDashboardView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
+                    NavigationLink {
+                        NoiseProtocolsView()
+                    } label: {
+                        Label("Lärmprotokoll führen", systemImage: "waveform.badge.plus")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
                 }
                 .padding(.vertical, 8)
             }
@@ -31,6 +39,11 @@ struct HomeDashboardView: View {
             Section("Übersicht") {
                 Button(action: openCases) {
                     LabeledContent("Offene Fälle", value: "\(openCasesCount)")
+                }
+                NavigationLink {
+                    NoiseProtocolsView()
+                } label: {
+                    LabeledContent("Laufende Lärmprotokolle", value: "\(openNoiseProtocolCount)")
                 }
                 if let latestCase {
                     VStack(alignment: .leading, spacing: 4) {
@@ -75,6 +88,10 @@ struct HomeDashboardView: View {
 
     private var latestCase: StoredReportedCase? {
         store.state.reportedCases.max { $0.createdAt < $1.createdAt }
+    }
+
+    private var openNoiseProtocolCount: Int {
+        store.state.noiseProtocols.filter { $0.status == .open }.count
     }
 
     private var profileIsComplete: Bool {

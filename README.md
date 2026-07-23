@@ -23,7 +23,11 @@ Serverlose iPhone-App zur strukturierten Dokumentation von Vorfällen in verwalt
 
 Beim ersten Start führt ein mehrseitiges Tutorial durch die erforderliche Einrichtung und den Meldeablauf. Es kann später unter „Einstellungen → Hilfe“ erneut geöffnet werden.
 
-Erzeugte Meldungen werden mit ihrem PDF dauerhaft im geschützten App-Verzeichnis gespeichert. Über das Fallarchiv lassen sie sich als offen oder erledigt führen, wieder öffnen und erneut teilen. Pro Meldung wird festgehalten, ob sie das gemietete beziehungsweise eigene Objekt oder eine Allgemeinfläche betrifft. Eine spätere Synchronisierung über den persönlichen iCloud-Account ist vorbereitet, aber noch nicht aktiviert.
+Erzeugte Meldungen werden mit ihrem PDF dauerhaft im geschützten App-Verzeichnis gespeichert. Über das Fallarchiv lassen sie sich als offen oder erledigt führen, wieder öffnen und erneut teilen. Pro Meldung wird festgehalten, ob sie das gemietete beziehungsweise eigene Objekt oder eine Allgemeinfläche betrifft. Profil, Objekte, Hausverwaltungen, Falldaten, Fotos und PDFs können optional über den privaten iCloud-Bereich des Benutzers synchronisiert werden.
+
+Für wiederkehrende Ruhestörungen gibt es zusätzlich fortlaufende Lärmprotokolle. Ein Protokoll sammelt über Wochen oder Monate beliebig viele Ruhestörungen und Einsätze beziehungsweise Maßnahmen in einer gemeinsamen Zeitleiste. Pro Vorfall können mehrere Videos mit Ton direkt aufgenommen oder aus der Mediathek übernommen werden. Beginn und Ende des gesamten Vorfalls werden getrennt von der Dauer der Beweisaufnahme festgehalten. Polizei- und andere Einsätze können mit Verständigungs-, Ankunfts- und Endzeit, frei definierbarer Art der Einsatzkräfte, Dienststelle, Namen beziehungsweise Dienstnummern, Aktenzeichen und Ergebnis dokumentiert werden.
+
+Das Lärmprotokoll-PDF enthält einen Geschäftsbrief, eine chronologische Darstellung und ein Anlagenverzeichnis. Jede digitale Beweisdatei wird einem Eintrag wie `L-001` oder `E-001` zugeordnet und mit vollständiger SHA-256-Prüfsumme ausgewiesen. Das exportierbare Beweispaket enthält PDF, Originalvideos und ein maschinenlesbares JSON-Manifest in einer ZIP-Datei. Große Pakete können über Apple Mail mit Mail Drop gesendet oder über die Dateien-App in iCloud Drive gespeichert und von dort geteilt werden. Originalvideos bleiben bis zu einem ausdrücklichen Export ausschließlich im geschützten lokalen App-Verzeichnis; sie werden wegen ihrer Größe nicht automatisch als CloudKit-Dateien synchronisiert.
 
 Für die lokale Bilderkennung wählt die Nutzerin oder der Nutzer eine feste Meldekategorie und importiert ein Foto oder nimmt es direkt auf. Apple Vision klassifiziert das Bild und liest mögliche Kennzeichen. Die zweite Erkennungsstufe schlägt zusätzlich Fahrzeugtyp, eine heuristisch bestimmte Farbe und relevante Nebenobjekte wie Matratze oder Sperrmüll vor. Vorschläge werden erst nach manueller Prüfung in die Meldung übernommen.
 
@@ -66,8 +70,7 @@ Die Entwicklung kann unter Windows erfolgen. GitHub Actions übernimmt Pakettest
 
 ## Noch nicht enthalten
 
-- lokale Ablage unfertiger Meldungen
-- nachvollziehbare Versions- und Änderungshistorie einer Meldung
-- iCloud-/CloudKit-Synchronisierung im Benutzerkontext
+- vollständige nachvollziehbare Versions- und Änderungshistorie bereits gespeicherter Protokolleinträge
+- automatische CloudKit-Synchronisierung großer Originalvideos
 - endgültige App-Store-Veröffentlichung
 - rechtliche Prüfung des Dokumentationsprozesses
