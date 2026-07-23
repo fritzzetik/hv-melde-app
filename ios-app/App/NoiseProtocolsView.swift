@@ -2,6 +2,7 @@ import HVMeldeCore
 import PhotosUI
 import SwiftUI
 import UIKit
+import AVKit
 
 struct NoiseProtocolsView: View {
     @EnvironmentObject private var store: AppDataStore
@@ -223,7 +224,8 @@ struct NoiseProtocolDetailView: View {
                         ForEach(Array(noiseProtocol.entries.sorted { $0.startedAt > $1.startedAt }.enumerated()), id: \.element.id) { _, entry in
                             NoiseTimelineEntryRow(
                                 entry: entry,
-                                number: timelineNumber(for: entry, in: noiseProtocol)
+                                number: timelineNumber(for: entry, in: noiseProtocol),
+                                protocolID: protocolID
                             )
                         }
                     }
@@ -358,8 +360,11 @@ struct NoiseProtocolDetailView: View {
 }
 
 private struct NoiseTimelineEntryRow: View {
+    @EnvironmentObject private var store: AppDataStore
     let entry: NoiseTimelineEntry
     let number: String
+    let protocolID: UUID
+    @State private var playback: EvidencePlayback?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -398,9 +403,59 @@ private struct NoiseTimelineEntryRow: View {
                 Label("\(entry.evidenceFiles.count) Beweisdateien", systemImage: "paperclip")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                ForEach(entry.evidenceFiles) { evidence in
+                    if let url = store.noiseEvidenceURL(for: evidence, protocolID: protocolID) {
+                        Button {
+                            playback = EvidencePlayback(url: url, title: evidence.originalFileName)
+                        } label: {
+                            Label(evidence.originalFileName, systemImage: "play.rectangle")
+                        }
+                        .buttonStyle(.borderless)
+                    } else {
+                        Label("\(evidence.originalFileName) – nur auf dem Aufnahmegerät verfügbar", systemImage: "exclamationmark.icloud")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
         .padding(.vertical, 3)
+        .sheet(item: $playback) { item in
+            EvidenceVideoPlayerView(item: item)
+        }
+    }
+}
+
+private struct EvidencePlayback: Identifiable {
+    let id = UUID()
+    let url: URL
+    let title: String
+}
+
+private struct EvidenceVideoPlayerView: View {
+    @Environment(\.dismiss) private var dismiss
+    let item: EvidencePlayback
+    @State private var player: AVPlayer
+
+    init(item: EvidencePlayback) {
+        self.item = item
+        _player = State(initialValue: AVPlayer(url: item.url))
+    }
+
+    var body: some View {
+        NavigationStack {
+            VideoPlayer(player: player)
+                .background(Color.black)
+                .navigationTitle(item.title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Fertig") { dismiss() }
+                    }
+                }
+                .onAppear { player.play() }
+                .onDisappear { player.pause() }
+        }
     }
 }
 

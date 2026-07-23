@@ -325,6 +325,16 @@ private struct NewReportView: View {
                     Text(category.rawValue).tag(category.id)
                 }
             }
+            if category.id == ReportCategory.noise.id {
+                NavigationLink {
+                    NoiseProtocolsView()
+                } label: {
+                    Label("Stattdessen fortlaufendes Lärmprotokoll führen", systemImage: "waveform.badge.plus")
+                }
+                Text("Für wiederkehrende Ruhestörungen über mehrere Tage oder Monate ist das Lärmprotokoll vorgesehen. Eine einmalige Meldung kannst du hier weiterhin erstellen.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         Section("Objekt") {
             if store.state.properties.isEmpty {

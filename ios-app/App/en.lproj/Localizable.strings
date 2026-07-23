@@ -307,3 +307,6 @@
 "Ergebnis" = "Outcome";
 "Getroffene Maßnahmen und Ergebnis" = "Actions taken and outcome";
 "Weitere sachliche Angaben" = "Further factual information";
+"Stattdessen fortlaufendes Lärmprotokoll führen" = "Keep an ongoing noise log instead";
+"Für wiederkehrende Ruhestörungen über mehrere Tage oder Monate ist das Lärmprotokoll vorgesehen. Eine einmalige Meldung kannst du hier weiterhin erstellen." = "The noise log is intended for recurring disturbances over several days or months. You can still create a one-off report here.";
+"Fertig" = "Done";
