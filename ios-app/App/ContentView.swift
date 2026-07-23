@@ -148,19 +148,7 @@ private struct NewReportView: View {
                     reviewStep
                 }
 
-                Section {
-                    HStack {
-                        if currentStep != .object {
-                            Button("Zurück") { moveStep(by: -1) }
-                        }
-                        Spacer()
-                        if currentStep != .review {
-                            Button("Weiter") { moveStep(by: 1) }
-                                .buttonStyle(.borderedProminent)
-                                .disabled(!canContinue)
-                        }
-                    }
-                }
+                stepNavigationSection
             }
             .navigationTitle("Neue Meldung")
             .toolbar {
@@ -285,6 +273,23 @@ private struct NewReportView: View {
             categories.append(category)
         }
         return categories
+    }
+
+    @ViewBuilder
+    private var stepNavigationSection: some View {
+        Section {
+            HStack {
+                if currentStep != .object {
+                    Button("Zurück") { moveStep(by: -1) }
+                }
+                Spacer()
+                if currentStep != .review {
+                    Button("Weiter") { moveStep(by: 1) }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!canContinue)
+                }
+            }
+        }
     }
 
     @ViewBuilder
