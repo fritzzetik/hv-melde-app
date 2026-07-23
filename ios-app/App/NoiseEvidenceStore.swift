@@ -104,7 +104,7 @@ enum NoiseEvidenceStore {
     private static func videoCreationDate(from asset: AVURLAsset) async -> Date? {
         guard let metadata = try? await asset.load(.commonMetadata) else { return nil }
         for item in metadata where item.commonKey == .commonKeyCreationDate {
-            guard let value = try? await item.load(.stringValue), let value else { continue }
+            guard let value = try? await item.load(.stringValue) else { continue }
             if let date = ISO8601DateFormatter().date(from: value) {
                 return date
             }
