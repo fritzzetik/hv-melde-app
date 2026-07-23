@@ -123,33 +123,88 @@ private struct NewReportView: View {
     @State private var activeTranslationSession: TranslationSession?
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    ProgressView(value: Double(currentStep.rawValue + 1), total: Double(ReportStep.allCases.count))
-                    Text("Schritt \(currentStep.rawValue + 1) von \(ReportStep.allCases.count): \(currentStep.title)")
-                        .font(.subheadline.bold())
-                }
-
-                switch currentStep {
-                case .object:
-                    objectStep
-                case .incident:
-                    incidentStep
-                case .photos:
-                    PhotoAnalysisSection(
-                        reportID: reportID,
-                        category: category,
-                        evidencePhotos: $evidencePhotos,
-                        reviewTarget: $analysisReviewTarget
-                    )
-                    .id(reportID)
-                case .review:
-                    reviewStep
-                }
-
-                stepNavigationSection
+        reportDialogs
+            .translationTask(translationConfiguration) { session in
+                await translateAndGeneratePDF(using: session)
             }
+    }
+
+    private var reportDialogs: some View {
+        reportSheets
+            .alert("Meldung konnte nicht gespeichert werden", isPresented: errorIsPresented) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorMessage ?? store.lastError ?? "Unbekannter Fehler")
+            }
+            .confirmationDialog(
+                "Meldung abbrechen?",
+                isPresented: $showsCancelConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Entwurf und Fotos löschen", role: .destructive) {
+                    cancelDraft()
+                }
+                Button("Weiter bearbeiten", role: .cancel) {}
+            } message: {
+                Text("Alle noch nicht als Fall gespeicherten Angaben und Beweisfotos dieser Meldung werden entfernt.")
+            }
+            .confirmationDialog(
+                "Lokale Übersetzung nicht verfügbar",
+                isPresented: translationFailureIsPresented,
+                titleVisibility: .visible
+            ) {
+                Button("PDF stattdessen auf Deutsch erstellen") {
+                    generateGermanFallbackPDF()
+                }
+                Button("Übersetzung erneut versuchen") {
+                    translationFailureMessage = nil
+                    startPDFGeneration()
+                }
+                Button("Abbrechen", role: .cancel) {
+                    cancelTranslation()
+                }
+            } message: {
+                Text(translationFailureMessage ?? "Das benötigte Sprachmodell ist auf diesem Gerät nicht verfügbar.")
+            }
+    }
+
+    private var reportSheets: some View {
+        reportNavigation
+            .sheet(item: $mailDraft) { draft in
+                MailComposerView(draft: draft)
+            }
+            .sheet(item: $analysisReviewTarget) { target in
+                ImageAnalysisReviewView(
+                    analysis: target.analysis,
+                    currentLicensePlate: licensePlate,
+                    currentVehicleDescription: vehicleDescription
+                ) { confirmedPlate, confirmedVehicle, confirmedSummary in
+                    applyAnalysisConfirmation(
+                        target.analysis,
+                        photoID: target.photoID,
+                        plate: confirmedPlate,
+                        vehicle: confirmedVehicle,
+                        summary: confirmedSummary
+                    )
+                }
+            }
+            .sheet(isPresented: $showsTranslationReview, onDismiss: {
+                if translatedTextReview != nil { cancelTranslation() }
+                translatedTextReview = nil
+            }) {
+                if let translatedTextReview {
+                    TranslationReviewView(initialTranslation: translatedTextReview) { confirmedTranslation in
+                        self.translatedTextReview = nil
+                        showsTranslationReview = false
+                        generatePDF(translatedText: confirmedTranslation)
+                    }
+                }
+            }
+    }
+
+    private var reportNavigation: some View {
+        NavigationStack {
+            reportForm
             .navigationTitle("Neue Meldung")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -191,74 +246,41 @@ private struct NewReportView: View {
                 store.saveDraft(draft)
                 hasUnsavedDraft = draft.hasMeaningfulContent
             }
-            .sheet(item: $mailDraft) { draft in
-                MailComposerView(draft: draft)
+        }
+    }
+
+    private var reportForm: some View {
+        Form {
+            Section {
+                ProgressView(
+                    value: Double(currentStep.rawValue + 1),
+                    total: Double(ReportStep.allCases.count)
+                )
+                Text("Schritt \(currentStep.rawValue + 1) von \(ReportStep.allCases.count): \(currentStep.title)")
+                    .font(.subheadline.bold())
             }
-            .sheet(item: $analysisReviewTarget) { target in
-                ImageAnalysisReviewView(
-                    analysis: target.analysis,
-                    currentLicensePlate: licensePlate,
-                    currentVehicleDescription: vehicleDescription
-                ) { confirmedPlate, confirmedVehicle, confirmedSummary in
-                    applyAnalysisConfirmation(
-                        target.analysis,
-                        photoID: target.photoID,
-                        plate: confirmedPlate,
-                        vehicle: confirmedVehicle,
-                        summary: confirmedSummary
-                    )
-                }
-            }
-            .sheet(isPresented: $showsTranslationReview, onDismiss: {
-                if translatedTextReview != nil { cancelTranslation() }
-                translatedTextReview = nil
-            }) {
-                if let translatedTextReview {
-                    TranslationReviewView(initialTranslation: translatedTextReview) { confirmedTranslation in
-                        self.translatedTextReview = nil
-                        showsTranslationReview = false
-                        generatePDF(translatedText: confirmedTranslation)
-                    }
-                }
-            }
-            .alert("Meldung konnte nicht gespeichert werden", isPresented: errorIsPresented) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorMessage ?? store.lastError ?? "Unbekannter Fehler")
-            }
-            .confirmationDialog(
-                "Meldung abbrechen?",
-                isPresented: $showsCancelConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Entwurf und Fotos löschen", role: .destructive) {
-                    cancelDraft()
-                }
-                Button("Weiter bearbeiten", role: .cancel) {}
-            } message: {
-                Text("Alle noch nicht als Fall gespeicherten Angaben und Beweisfotos dieser Meldung werden entfernt.")
-            }
-            .confirmationDialog(
-                "Lokale Übersetzung nicht verfügbar",
-                isPresented: translationFailureIsPresented,
-                titleVisibility: .visible
-            ) {
-                Button("PDF stattdessen auf Deutsch erstellen") {
-                    generateGermanFallbackPDF()
-                }
-                Button("Übersetzung erneut versuchen") {
-                    translationFailureMessage = nil
-                    startPDFGeneration()
-                }
-                Button("Abbrechen", role: .cancel) {
-                    cancelTranslation()
-                }
-            } message: {
-                Text(translationFailureMessage ?? "Das benötigte Sprachmodell ist auf diesem Gerät nicht verfügbar.")
-            }
-            .translationTask(translationConfiguration) { session in
-                await translateAndGeneratePDF(using: session)
-            }
+            currentStepContent
+            stepNavigationSection
+        }
+    }
+
+    @ViewBuilder
+    private var currentStepContent: some View {
+        switch currentStep {
+        case .object:
+            objectStep
+        case .incident:
+            incidentStep
+        case .photos:
+            PhotoAnalysisSection(
+                reportID: reportID,
+                category: category,
+                evidencePhotos: $evidencePhotos,
+                reviewTarget: $analysisReviewTarget
+            )
+            .id(reportID)
+        case .review:
+            reviewStep
         }
     }
 
