@@ -178,6 +178,15 @@
 "Ohne manuelle Auswahl übernimmt die App Sprache und Region aus den iOS-Einstellungen." = "Senza una selezione manuale, l’app usa la lingua e la regione impostate in iOS.";
 "Übersetzungsmodell wird vorbereitet …" = "Preparazione del modello di traduzione…";
 "Freitexte werden lokal übersetzt …" = "Traduzione locale dei campi di testo libero…";
+"Verfügbarkeit der lokalen Übersetzung wird geprüft …" = "Verifica della disponibilità della traduzione sul dispositivo…";
+"Sprachmodell wird vorbereitet oder geladen …" = "Preparazione o download del modello linguistico…";
+"Lokale Übersetzung nicht verfügbar" = "Traduzione sul dispositivo non disponibile";
+"PDF stattdessen auf Deutsch erstellen" = "Crea invece il PDF in tedesco";
+"Übersetzung erneut versuchen" = "Riprova la traduzione";
+"Übersetzung abbrechen" = "Annulla traduzione";
+"Das benötigte Sprachmodell ist auf diesem Gerät nicht verfügbar." = "Il modello linguistico necessario non è disponibile su questo dispositivo.";
+"Die gewählte Sprachkombination wird auf diesem Gerät nicht unterstützt." = "La combinazione linguistica selezionata non è supportata su questo dispositivo.";
+"Die Verfügbarkeit der lokalen Übersetzung konnte nicht bestimmt werden." = "Non è stato possibile determinare la disponibilità della traduzione sul dispositivo.";
 "Hilfe" = "Aiuto";
 "Anleitung und erste Schritte" = "Guida e primi passi";
 "Überspringen" = "Salta";

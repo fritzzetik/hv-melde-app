@@ -178,6 +178,15 @@
 "Ohne manuelle Auswahl übernimmt die App Sprache und Region aus den iOS-Einstellungen." = "Without a manual selection, the app uses the language and region from iOS Settings.";
 "Übersetzungsmodell wird vorbereitet …" = "Preparing the translation model…";
 "Freitexte werden lokal übersetzt …" = "Translating free-text fields on device…";
+"Verfügbarkeit der lokalen Übersetzung wird geprüft …" = "Checking on-device translation availability…";
+"Sprachmodell wird vorbereitet oder geladen …" = "Preparing or downloading the language model…";
+"Lokale Übersetzung nicht verfügbar" = "On-device translation unavailable";
+"PDF stattdessen auf Deutsch erstellen" = "Create the PDF in German instead";
+"Übersetzung erneut versuchen" = "Try translation again";
+"Übersetzung abbrechen" = "Cancel translation";
+"Das benötigte Sprachmodell ist auf diesem Gerät nicht verfügbar." = "The required language model is not available on this device.";
+"Die gewählte Sprachkombination wird auf diesem Gerät nicht unterstützt." = "The selected language combination is not supported on this device.";
+"Die Verfügbarkeit der lokalen Übersetzung konnte nicht bestimmt werden." = "The availability of on-device translation could not be determined.";
 "Hilfe" = "Help";
 "Anleitung und erste Schritte" = "Guide and getting started";
 "Überspringen" = "Skip";

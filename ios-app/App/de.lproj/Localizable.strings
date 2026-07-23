@@ -10,6 +10,15 @@
 "Ohne manuelle Auswahl übernimmt die App Sprache und Region aus den iOS-Einstellungen." = "Ohne manuelle Auswahl übernimmt die App Sprache und Region aus den iOS-Einstellungen.";
 "Übersetzungsmodell wird vorbereitet …" = "Übersetzungsmodell wird vorbereitet …";
 "Freitexte werden lokal übersetzt …" = "Freitexte werden lokal übersetzt …";
+"Verfügbarkeit der lokalen Übersetzung wird geprüft …" = "Verfügbarkeit der lokalen Übersetzung wird geprüft …";
+"Sprachmodell wird vorbereitet oder geladen …" = "Sprachmodell wird vorbereitet oder geladen …";
+"Lokale Übersetzung nicht verfügbar" = "Lokale Übersetzung nicht verfügbar";
+"PDF stattdessen auf Deutsch erstellen" = "PDF stattdessen auf Deutsch erstellen";
+"Übersetzung erneut versuchen" = "Übersetzung erneut versuchen";
+"Übersetzung abbrechen" = "Übersetzung abbrechen";
+"Das benötigte Sprachmodell ist auf diesem Gerät nicht verfügbar." = "Das benötigte Sprachmodell ist auf diesem Gerät nicht verfügbar.";
+"Die gewählte Sprachkombination wird auf diesem Gerät nicht unterstützt." = "Die gewählte Sprachkombination wird auf diesem Gerät nicht unterstützt.";
+"Die Verfügbarkeit der lokalen Übersetzung konnte nicht bestimmt werden." = "Die Verfügbarkeit der lokalen Übersetzung konnte nicht bestimmt werden.";
 "Hilfe" = "Hilfe";
 "Anleitung und erste Schritte" = "Anleitung und erste Schritte";
 "Überspringen" = "Überspringen";

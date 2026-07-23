@@ -118,6 +118,9 @@ private struct NewReportView: View {
     @State private var translationProgressText: String?
     @State private var translatedTextReview: PDFReportRenderer.ReportTextTranslation?
     @State private var showsTranslationReview = false
+    @State private var translationFailureMessage: String?
+    @State private var translationRequestID: UUID?
+    @State private var activeTranslationSession: TranslationSession?
 
     var body: some View {
         NavigationStack {
@@ -219,7 +222,7 @@ private struct NewReportView: View {
                 }
             }
             .sheet(isPresented: $showsTranslationReview, onDismiss: {
-                if translatedTextReview != nil { isGeneratingPDF = false }
+                if translatedTextReview != nil { cancelTranslation() }
                 translatedTextReview = nil
             }) {
                 if let translatedTextReview {
@@ -246,6 +249,24 @@ private struct NewReportView: View {
                 Button("Weiter bearbeiten", role: .cancel) {}
             } message: {
                 Text("Alle noch nicht als Fall gespeicherten Angaben und Beweisfotos dieser Meldung werden entfernt.")
+            }
+            .confirmationDialog(
+                "Lokale Übersetzung nicht verfügbar",
+                isPresented: translationFailureIsPresented,
+                titleVisibility: .visible
+            ) {
+                Button("PDF stattdessen auf Deutsch erstellen") {
+                    generateGermanFallbackPDF()
+                }
+                Button("Übersetzung erneut versuchen") {
+                    translationFailureMessage = nil
+                    startPDFGeneration()
+                }
+                Button("Abbrechen", role: .cancel) {
+                    cancelTranslation()
+                }
+            } message: {
+                Text(translationFailureMessage ?? "Das benötigte Sprachmodell ist auf diesem Gerät nicht verfügbar.")
             }
             .translationTask(translationConfiguration) { session in
                 await translateAndGeneratePDF(using: session)
@@ -369,6 +390,14 @@ private struct NewReportView: View {
                 }
             }
                 .disabled(selectedProperty == nil || isGeneratingPDF)
+            if isGeneratingPDF {
+                Button("PDF stattdessen auf Deutsch erstellen") {
+                    generateGermanFallbackPDF()
+                }
+                Button("Übersetzung abbrechen", role: .cancel) {
+                    cancelTranslation()
+                }
+            }
             if let generatedPDF {
                 Label("Fall wurde lokal gespeichert", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
@@ -420,6 +449,15 @@ private struct NewReportView: View {
         )
     }
 
+    private var translationFailureIsPresented: Binding<Bool> {
+        Binding(
+            get: { translationFailureMessage != nil },
+            set: {
+                if !$0 { translationFailureMessage = nil }
+            }
+        )
+    }
+
     private func selectFirstPropertyIfNeeded() {
         if let selectedPropertyID,
            store.state.properties.contains(where: { $0.id == selectedPropertyID }) {
@@ -439,35 +477,85 @@ private struct NewReportView: View {
             return
         }
 
+        cancelTranslation()
+        let requestID = UUID()
+        translationRequestID = requestID
         isGeneratingPDF = true
-        translationProgressText = "Übersetzungsmodell wird vorbereitet …"
+        translationProgressText = "Verfügbarkeit der lokalen Übersetzung wird geprüft …"
         errorMessage = nil
+        translationFailureMessage = nil
         translatedTextReview = nil
-        let configuration = TranslationSession.Configuration(
-            source: Locale.Language(identifier: "de"),
-            target: Locale.Language(identifier: targetCode)
-        )
-        if translationConfiguration == configuration {
-            translationConfiguration?.invalidate()
-        } else {
-            translationConfiguration = configuration
+
+        Task { @MainActor in
+            let source = Locale.Language(identifier: "de")
+            let target = Locale.Language(identifier: targetCode)
+            let status = await LanguageAvailability().status(from: source, to: target)
+            guard translationRequestID == requestID else { return }
+
+            switch status {
+            case .installed:
+                translationProgressText = "Freitexte werden lokal übersetzt …"
+            case .supported:
+                translationProgressText = "Sprachmodell wird vorbereitet oder geladen …"
+            case .unsupported:
+                failTranslation("Die gewählte Sprachkombination wird auf diesem Gerät nicht unterstützt.")
+                return
+            @unknown default:
+                failTranslation("Die Verfügbarkeit der lokalen Übersetzung konnte nicht bestimmt werden.")
+                return
+            }
+
+            let configuration = TranslationSession.Configuration(source: source, target: target)
+            if translationConfiguration == configuration {
+                translationConfiguration?.invalidate()
+            } else {
+                translationConfiguration = configuration
+            }
         }
     }
 
     private func translateAndGeneratePDF(using session: TranslationSession) async {
+        guard let requestID = translationRequestID else { return }
+        activeTranslationSession = session
         do {
             try await session.prepareTranslation()
+            guard translationRequestID == requestID else { return }
             translationProgressText = "Freitexte werden lokal übersetzt …"
             let translatedText = try await translateReportText(using: session)
+            guard translationRequestID == requestID else { return }
             translationProgressText = nil
+            activeTranslationSession = nil
             translatedTextReview = translatedText
             showsTranslationReview = true
         } catch {
-            isGeneratingPDF = false
-            translationProgressText = nil
-            translationConfiguration = nil
-            errorMessage = "Die lokale Übersetzung konnte nicht erstellt werden: \(error.localizedDescription)"
+            guard translationRequestID == requestID else { return }
+            failTranslation("Die lokale Übersetzung konnte nicht erstellt werden: \(error.localizedDescription)")
         }
+    }
+
+    private func failTranslation(_ message: String) {
+        activeTranslationSession?.cancel()
+        activeTranslationSession = nil
+        translationRequestID = nil
+        translationConfiguration = nil
+        translationProgressText = nil
+        isGeneratingPDF = false
+        translationFailureMessage = message
+    }
+
+    private func cancelTranslation() {
+        activeTranslationSession?.cancel()
+        activeTranslationSession = nil
+        translationRequestID = nil
+        translationConfiguration = nil
+        translationProgressText = nil
+        translationFailureMessage = nil
+        isGeneratingPDF = false
+    }
+
+    private func generateGermanFallbackPDF() {
+        cancelTranslation()
+        generatePDF(translatedText: nil, reportLanguageOverride: .german)
     }
 
     private func translateReportText(using session: TranslationSession) async throws -> PDFReportRenderer.ReportTextTranslation {
@@ -485,7 +573,16 @@ private struct NewReportView: View {
         return try await session.translate(text).targetText
     }
 
-    private func generatePDF(translatedText: PDFReportRenderer.ReportTextTranslation?) {
+    private func generatePDF(
+        translatedText: PDFReportRenderer.ReportTextTranslation?,
+        reportLanguageOverride: ReportLanguage? = nil
+    ) {
+        activeTranslationSession?.cancel()
+        activeTranslationSession = nil
+        translationRequestID = nil
+        translationConfiguration = nil
+        translationProgressText = nil
+
         guard let property = selectedProperty else {
             errorMessage = "Bitte lege ein Objekt an und wähle es aus."
             isGeneratingPDF = false
@@ -511,11 +608,15 @@ private struct NewReportView: View {
 
         do {
             try IncidentReportValidator.validate(report)
+            var reportManagement = store.management(for: property)
+            if let reportLanguageOverride {
+                reportManagement?.reportLanguage = reportLanguageOverride
+            }
             let temporaryPDF = try PDFReportRenderer.render(
                 report,
                 profile: store.state.profile,
                 property: property,
-                management: store.management(for: property),
+                management: reportManagement,
                 evidencePhotos: evidencePhotos,
                 technicalAttachmentMode: store.state.preferences.technicalAttachmentMode,
                 translatedText: translatedText
@@ -582,7 +683,7 @@ private struct NewReportView: View {
         mailDraft = nil
         errorMessage = nil
         translationProgressText = nil
-        translationConfiguration = nil
+        cancelTranslation()
         store.clearDraft()
         hasUnsavedDraft = false
         currentStep = .object
