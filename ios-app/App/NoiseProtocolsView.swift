@@ -302,8 +302,8 @@ struct NoiseProtocolDetailView: View {
         store.state.noiseProtocols.first { $0.id == protocolID }
     }
 
-    private func timelineNumber(for entry: NoiseTimelineEntry, in protocol: NoiseProtocol) -> String {
-        let sameKind = protocol.entries
+    private func timelineNumber(for entry: NoiseTimelineEntry, in noiseProtocol: NoiseProtocol) -> String {
+        let sameKind = noiseProtocol.entries
             .filter { $0.kind == entry.kind }
             .sorted { $0.startedAt < $1.startedAt }
         let index = (sameKind.firstIndex(where: { $0.id == entry.id }) ?? 0) + 1
