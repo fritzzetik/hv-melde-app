@@ -1,4 +1,5 @@
 import HVMeldeCore
+import MessageUI
 import PhotosUI
 import SwiftUI
 import UIKit
@@ -155,7 +156,9 @@ struct NoiseProtocolDetailView: View {
     @State private var showsDisturbance = false
     @State private var showsIntervention = false
     @State private var showsDeleteConfirmation = false
-    @State private var exportURL: URL?
+    @State private var pdfURL: URL?
+    @State private var evidencePackageURL: URL?
+    @State private var mailDraft: MailDraft?
     @State private var exportError: String?
     @State private var isExporting = false
 
@@ -230,7 +233,7 @@ struct NoiseProtocolDetailView: View {
                         }
                     }
 
-                    Section("Ausgabe") {
+                    Section("PDF-Protokoll") {
                         Button {
                             createPDF(noiseProtocol)
                         } label: {
@@ -242,6 +245,27 @@ struct NoiseProtocolDetailView: View {
                         }
                         .disabled(noiseProtocol.entries.isEmpty || isExporting)
 
+                        if let pdfURL {
+                            Label("PDF wurde erstellt", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            Button {
+                                preparePDFMail(pdfURL: pdfURL, noiseProtocol: noiseProtocol)
+                            } label: {
+                                Label("PDF per E-Mail senden", systemImage: "envelope")
+                            }
+                            .disabled(!MFMailComposeViewController.canSendMail())
+                            ShareLink(item: pdfURL) {
+                                Label("PDF teilen", systemImage: "square.and.arrow.up")
+                            }
+                            DocumentExportButton(url: pdfURL)
+                        }
+
+                        Text("Das PDF kann separat versendet werden. Die Originaldateien sind nicht enthalten und können anschließend optional als Beweispaket übermittelt werden.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Section("Beweisdateien (optional)") {
                         Button {
                             createEvidencePackage(noiseProtocol)
                         } label: {
@@ -253,11 +277,13 @@ struct NoiseProtocolDetailView: View {
                         }
                         .disabled(noiseProtocol.entries.isEmpty || isExporting)
 
-                        if let exportURL {
-                            ShareLink(item: exportURL) {
-                                Label("Erstellte Datei teilen", systemImage: "square.and.arrow.up")
+                        if let evidencePackageURL {
+                            Label("Beweispaket wurde erstellt", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            ShareLink(item: evidencePackageURL) {
+                                Label("Beweispaket teilen", systemImage: "square.and.arrow.up")
                             }
-                            DocumentExportButton(url: exportURL)
+                            DocumentExportButton(url: evidencePackageURL)
                         }
                         Text("Große Beweispakete können über Apple Mail per Mail Drop gesendet oder in iCloud Drive gespeichert und von dort als Link geteilt werden.")
                             .font(.caption)
@@ -281,6 +307,9 @@ struct NoiseProtocolDetailView: View {
         }
         .sheet(isPresented: $showsIntervention) {
             NoiseInterventionEditor(protocolID: protocolID)
+        }
+        .sheet(item: $mailDraft) { draft in
+            MailComposerView(draft: draft)
         }
         .confirmationDialog("Lärmprotokoll löschen?", isPresented: $showsDeleteConfirmation) {
             Button("Lärmprotokoll und Beweisdateien löschen", role: .destructive) {
@@ -314,15 +343,12 @@ struct NoiseProtocolDetailView: View {
 
     private func createPDF(_ noiseProtocol: NoiseProtocol) {
         isExporting = true
-        exportURL = nil
+        pdfURL = nil
         do {
-            exportURL = try NoiseProtocolPDFRenderer.render(
+            pdfURL = try NoiseProtocolPDFRenderer.render(
                 noiseProtocol: noiseProtocol,
                 profile: store.state.profile,
-                management: store.state.propertyManagements.first {
-                    store.state.properties.first(where: { $0.id == noiseProtocol.propertyID })?
-                        .propertyManagementID == $0.id
-                },
+                management: management(for: noiseProtocol),
                 evidenceURL: { store.noiseEvidenceURL(for: $0, protocolID: protocolID) }
             )
         } catch {
@@ -333,20 +359,17 @@ struct NoiseProtocolDetailView: View {
 
     private func createEvidencePackage(_ noiseProtocol: NoiseProtocol) {
         isExporting = true
-        exportURL = nil
+        evidencePackageURL = nil
         Task {
             do {
                 let url = try await NoiseEvidencePackageExporter.create(
                     noiseProtocol: noiseProtocol,
                     profile: store.state.profile,
-                    management: store.state.propertyManagements.first {
-                        store.state.properties.first(where: { $0.id == noiseProtocol.propertyID })?
-                            .propertyManagementID == $0.id
-                    },
+                    management: management(for: noiseProtocol),
                     evidenceURL: { store.noiseEvidenceURL(for: $0, protocolID: protocolID) }
                 )
                 await MainActor.run {
-                    exportURL = url
+                    evidencePackageURL = url
                     isExporting = false
                 }
             } catch {
@@ -356,6 +379,35 @@ struct NoiseProtocolDetailView: View {
                 }
             }
         }
+    }
+
+    private func preparePDFMail(pdfURL: URL, noiseProtocol: NoiseProtocol) {
+        let property = store.state.properties.first { $0.id == noiseProtocol.propertyID }
+        let reportEmail = property?.reportEmail.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let recipients = reportEmail.isEmpty ? [] : [reportEmail]
+        let subject = "\(noiseProtocol.recipientPropertyName) - \(noiseProtocol.title)"
+        mailDraft = MailDraft(
+            recipients: recipients,
+            subject: subject,
+            body: """
+            Guten Tag,
+
+            im Anhang übermittle ich das Lärmprotokoll zum Objekt \(noiseProtocol.recipientPropertyName).
+            Die zugehörigen Beweisdateien können bei Bedarf gesondert übermittelt werden.
+
+            Mit freundlichen Grüßen
+            \(store.state.profile.fullName)
+            """,
+            attachmentURL: pdfURL
+        )
+    }
+
+    private func management(for noiseProtocol: NoiseProtocol) -> PropertyManagement? {
+        guard let property = store.state.properties.first(where: { $0.id == noiseProtocol.propertyID }),
+              let managementID = property.propertyManagementID else {
+            return nil
+        }
+        return store.state.propertyManagements.first { $0.id == managementID }
     }
 }
 

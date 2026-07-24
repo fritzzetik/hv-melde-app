@@ -317,3 +317,10 @@
 "Fehlende Pflichtfelder" = "Missing required fields";
 "Originaltext (Deutsch)" = "Original text (German)";
 "Übersetzung bearbeiten" = "Edit translation";
+"PDF-Protokoll" = "PDF log";
+"PDF wurde erstellt" = "PDF created";
+"PDF teilen" = "Share PDF";
+"Das PDF kann separat versendet werden. Die Originaldateien sind nicht enthalten und können anschließend optional als Beweispaket übermittelt werden." = "The PDF can be sent separately. It does not contain the original files, which can optionally be sent afterwards as an evidence package.";
+"Beweisdateien (optional)" = "Evidence files (optional)";
+"Beweispaket wurde erstellt" = "Evidence package created";
+"Beweispaket teilen" = "Share evidence package";

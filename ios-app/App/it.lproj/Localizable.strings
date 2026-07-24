@@ -317,3 +317,10 @@
 "Fehlende Pflichtfelder" = "Campi obbligatori mancanti";
 "Originaltext (Deutsch)" = "Testo originale (tedesco)";
 "Übersetzung bearbeiten" = "Modifica traduzione";
+"PDF-Protokoll" = "Registro PDF";
+"PDF wurde erstellt" = "PDF creato";
+"PDF teilen" = "Condividi PDF";
+"Das PDF kann separat versendet werden. Die Originaldateien sind nicht enthalten und können anschließend optional als Beweispaket übermittelt werden." = "Il PDF può essere inviato separatamente. Non contiene i file originali, che possono essere inviati successivamente come pacchetto probatorio facoltativo.";
+"Beweisdateien (optional)" = "File probatori (facoltativi)";
+"Beweispaket wurde erstellt" = "Pacchetto probatorio creato";
+"Beweispaket teilen" = "Condividi pacchetto probatorio";
