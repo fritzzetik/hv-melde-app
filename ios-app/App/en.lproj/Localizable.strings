@@ -310,3 +310,10 @@
 "Stattdessen fortlaufendes Lärmprotokoll führen" = "Keep an ongoing noise log instead";
 "Für wiederkehrende Ruhestörungen über mehrere Tage oder Monate ist das Lärmprotokoll vorgesehen. Eine einmalige Meldung kannst du hier weiterhin erstellen." = "The noise log is intended for recurring disturbances over several days or months. You can still create a one-off report here.";
 "Fertig" = "Done";
+"Pflichtfeld" = "Required field";
+"Bitte ausfüllen." = "Please complete this field.";
+"Bitte ein Objekt auswählen." = "Please select a property.";
+"Mit * gekennzeichnete Felder sind Pflichtfelder." = "Fields marked with * are required.";
+"Fehlende Pflichtfelder" = "Missing required fields";
+"Originaltext (Deutsch)" = "Original text (German)";
+"Übersetzung bearbeiten" = "Edit translation";

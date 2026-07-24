@@ -310,3 +310,10 @@
 "Stattdessen fortlaufendes Lärmprotokoll führen" = "Compila invece un registro continuativo dei rumori";
 "Für wiederkehrende Ruhestörungen über mehrere Tage oder Monate ist das Lärmprotokoll vorgesehen. Eine einmalige Meldung kannst du hier weiterhin erstellen." = "Il registro dei rumori è previsto per disturbi ricorrenti nell’arco di più giorni o mesi. Qui puoi comunque creare una segnalazione singola.";
 "Fertig" = "Fine";
+"Pflichtfeld" = "Campo obbligatorio";
+"Bitte ausfüllen." = "Compila questo campo.";
+"Bitte ein Objekt auswählen." = "Seleziona un immobile.";
+"Mit * gekennzeichnete Felder sind Pflichtfelder." = "I campi contrassegnati con * sono obbligatori.";
+"Fehlende Pflichtfelder" = "Campi obbligatori mancanti";
+"Originaltext (Deutsch)" = "Testo originale (tedesco)";
+"Übersetzung bearbeiten" = "Modifica traduzione";

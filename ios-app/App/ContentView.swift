@@ -114,7 +114,6 @@ private struct NewReportView: View {
     @State private var errorMessage: String?
     @State private var didRestoreDraft = false
     @State private var currentStep: ReportStep = .object
-    @State private var suppressNextCategoryReset = false
     @State private var showsCancelConfirmation = false
     @State private var translationConfiguration: TranslationSession.Configuration?
     @State private var isGeneratingPDF = false
@@ -196,7 +195,10 @@ private struct NewReportView: View {
                 translatedTextReview = nil
             }) {
                 if let translatedTextReview {
-                    TranslationReviewView(initialTranslation: translatedTextReview) { confirmedTranslation in
+                    TranslationReviewView(
+                        originalText: reportTextForTranslation,
+                        initialTranslation: translatedTextReview
+                    ) { confirmedTranslation in
                         self.translatedTextReview = nil
                         showsTranslationReview = false
                         generatePDF(translatedText: confirmedTranslation)
@@ -219,19 +221,6 @@ private struct NewReportView: View {
                 }
             }
             .onAppear(perform: restoreDraftIfNeeded)
-            .onChange(of: category) { _, newCategory in
-                if suppressNextCategoryReset {
-                    suppressNextCategoryReset = false
-                    generatedPDF = nil
-                    return
-                }
-                violation = newCategory.defaultViolation
-                generatedPDF = nil
-                if !newCategory.expectsVehicle {
-                    licensePlate = ""
-                    vehicleDescription = ""
-                }
-            }
             .onChange(of: store.state.properties) { _, _ in selectFirstPropertyIfNeeded() }
             .onChange(of: selectedPropertyID) { _, _ in generatedPDF = nil }
             .onChange(of: evidencePhotos.map(\.id)) { previousIDs, _ in
@@ -320,10 +309,12 @@ private struct NewReportView: View {
     @ViewBuilder
     private var objectStep: some View {
         Section("Meldekategorie") {
-            Picker("Kategorie", selection: selectedCategoryID) {
+            Picker(selection: selectedCategoryID) {
                 ForEach(selectableCategories) { category in
                     Text(category.rawValue).tag(category.id)
                 }
+            } label: {
+                requiredFieldLabel("Kategorie")
             }
             if category.id == ReportCategory.noise.id {
                 NavigationLink {
@@ -344,11 +335,16 @@ private struct NewReportView: View {
                     description: Text("Lege zuerst in den Einstellungen ein Objekt an.")
                 )
             } else {
-                Picker("Objekt", selection: $selectedPropertyID) {
+                Picker(selection: $selectedPropertyID) {
                     Text("Bitte wählen").tag(UUID?.none)
                     ForEach(store.state.properties) { property in
                         Text(property.displayName).tag(Optional(property.id))
                     }
+                } label: {
+                    requiredFieldLabel("Objekt")
+                }
+                if selectedProperty == nil {
+                    requiredFieldMessage("Bitte ein Objekt auswählen.")
                 }
                 if let selectedProperty {
                     LabeledContent("Objekttyp", value: selectedProperty.propertyType.rawValue)
@@ -369,7 +365,7 @@ private struct NewReportView: View {
             get: { category.id },
             set: { id in
                 guard let selected = selectableCategories.first(where: { $0.id == id }) else { return }
-                category = selected
+                selectCategory(selected)
             }
         )
     }
@@ -377,19 +373,21 @@ private struct NewReportView: View {
     @ViewBuilder
     private var incidentStep: some View {
         Section("Ort und Zeitpunkt") {
-            TextField("Bereich oder Ort im Objekt", text: $garageLocation)
+            requiredTextField("Bereich oder Ort im Objekt", text: $garageLocation)
             DatePicker("Beobachtet am", selection: $incidentAt)
         }
         Section(category.expectsVehicle ? "Fahrzeug und Vorfall" : "Vorfall") {
             if category.expectsVehicle {
-                TextField("Kennzeichen", text: $licensePlate)
+                requiredTextField("Kennzeichen", text: $licensePlate)
                     .textInputAutocapitalization(.characters)
                 TextField("Fahrzeugbeschreibung (optional)", text: $vehicleDescription)
             }
-            TextField("Meldegrund", text: $violation)
+            requiredTextField("Meldegrund", text: $violation)
             TextField("Sachliche Beschreibung (optional)", text: $notes, axis: .vertical)
                 .lineLimit(3...8)
             TextField("Zeugen (optional)", text: $witnesses)
+        } footer: {
+            Text("Mit * gekennzeichnete Felder sind Pflichtfelder.")
         }
         Section("Rückmeldung und Vertraulichkeit") {
             Toggle("Rückmeldung der Hausverwaltung erwünscht", isOn: $requestsManagementResponse)
@@ -402,6 +400,14 @@ private struct NewReportView: View {
 
     @ViewBuilder
     private var reviewStep: some View {
+        if !missingRequiredFields.isEmpty {
+            Section("Fehlende Pflichtfelder") {
+                ForEach(missingRequiredFields, id: \.rawValue) { field in
+                    Label(fieldLabel(field), systemImage: "exclamationmark.circle.fill")
+                        .foregroundStyle(.red)
+                }
+            }
+        }
         Section("Zusammenfassung") {
             LabeledContent("Objekt", value: selectedProperty?.officialDisplayName ?? "Nicht gewählt")
             LabeledContent("Kategorie", value: category.rawValue)
@@ -429,7 +435,7 @@ private struct NewReportView: View {
                     Text("PDF erzeugen")
                 }
             }
-                .disabled(selectedProperty == nil || isGeneratingPDF)
+                .disabled(!missingRequiredFields.isEmpty || isGeneratingPDF)
             if isGeneratingPDF {
                 Button("PDF stattdessen auf Deutsch erstellen") {
                     generateGermanFallbackPDF()
@@ -460,16 +466,7 @@ private struct NewReportView: View {
     }
 
     private var canContinue: Bool {
-        switch currentStep {
-        case .object:
-            selectedProperty != nil
-        case .incident:
-            !garageLocation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                && !violation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                && (!category.expectsVehicle || !licensePlate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        case .photos, .review:
-            true
-        }
+        missingRequiredFields(for: currentStep).isEmpty
     }
 
     private func moveStep(by offset: Int) {
@@ -504,6 +501,70 @@ private struct NewReportView: View {
             return
         }
         selectedPropertyID = store.state.properties.first?.id
+    }
+
+    private func selectCategory(_ selected: ReportCategory) {
+        category = selected
+        violation = selected.defaultViolation
+        generatedPDF = nil
+        if !selected.expectsVehicle {
+            licensePlate = ""
+            vehicleDescription = ""
+        }
+    }
+
+    private var missingRequiredFields: [IncidentReportField] {
+        var fields: [IncidentReportField] = []
+        if selectedProperty == nil {
+            fields.append(.propertyName)
+        }
+        if garageLocation.trimmedIsEmpty {
+            fields.append(.garageLocation)
+        }
+        if category.expectsVehicle && licensePlate.trimmedIsEmpty {
+            fields.append(.licensePlate)
+        }
+        if violation.trimmedIsEmpty {
+            fields.append(.violation)
+        }
+        return fields
+    }
+
+    private func missingRequiredFields(for step: ReportStep) -> [IncidentReportField] {
+        switch step {
+        case .object:
+            missingRequiredFields.filter { $0 == .propertyName }
+        case .incident:
+            missingRequiredFields.filter { $0 != .propertyName }
+        case .photos, .review:
+            []
+        }
+    }
+
+    @ViewBuilder
+    private func requiredTextField(_ title: LocalizedStringKey, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            requiredFieldLabel(title)
+            TextField(title, text: text)
+            if text.wrappedValue.trimmedIsEmpty {
+                requiredFieldMessage("Bitte ausfüllen.")
+            }
+        }
+    }
+
+    private func requiredFieldLabel(_ title: LocalizedStringKey) -> some View {
+        HStack(spacing: 2) {
+            Text(title)
+            Text("*")
+                .foregroundStyle(.red)
+                .accessibilityLabel("Pflichtfeld")
+        }
+    }
+
+    private func requiredFieldMessage(_ message: LocalizedStringKey) -> some View {
+        Label(message, systemImage: "exclamationmark.circle.fill")
+            .font(.caption)
+            .foregroundStyle(.red)
     }
 
     private func startPDFGeneration() {
@@ -605,6 +666,16 @@ private struct NewReportView: View {
             notes: try await translate(notes, using: session),
             vehicleDescription: try await translate(vehicleDescription, using: session),
             witnesses: try await translate(witnesses, using: session)
+        )
+    }
+
+    private var reportTextForTranslation: PDFReportRenderer.ReportTextTranslation {
+        PDFReportRenderer.ReportTextTranslation(
+            location: garageLocation,
+            violation: violation,
+            notes: notes,
+            vehicleDescription: vehicleDescription,
+            witnesses: witnesses
         )
     }
 
@@ -818,7 +889,6 @@ private struct NewReportView: View {
             reportID = draft.reportID
             reportCreatedAt = draft.reportCreatedAt
             selectedPropertyID = draft.selectedPropertyID
-            suppressNextCategoryReset = true
             category = draft.category
             incidentAt = draft.incidentAt
             garageLocation = draft.garageLocation
@@ -836,7 +906,6 @@ private struct NewReportView: View {
                 }
             }
         } else if let preferredCategory = store.activeReportCategories.first {
-            suppressNextCategoryReset = true
             category = preferredCategory
             violation = preferredCategory.defaultViolation
         }
@@ -896,13 +965,16 @@ private struct NewReportView: View {
 
 private struct TranslationReviewView: View {
     @Environment(\.dismiss) private var dismiss
+    let originalText: PDFReportRenderer.ReportTextTranslation
     @State private var translation: PDFReportRenderer.ReportTextTranslation
     let onConfirm: (PDFReportRenderer.ReportTextTranslation) -> Void
 
     init(
+        originalText: PDFReportRenderer.ReportTextTranslation,
         initialTranslation: PDFReportRenderer.ReportTextTranslation,
         onConfirm: @escaping (PDFReportRenderer.ReportTextTranslation) -> Void
     ) {
+        self.originalText = originalText
         _translation = State(initialValue: initialTranslation)
         self.onConfirm = onConfirm
     }
@@ -910,6 +982,19 @@ private struct TranslationReviewView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("Originaltext (Deutsch)") {
+                    originalTextRow("Bereich oder Ort im Objekt", value: originalText.location)
+                    originalTextRow("Meldegrund", value: originalText.violation)
+                    if !originalText.notes.trimmedIsEmpty {
+                        originalTextRow("Sachliche Beschreibung", value: originalText.notes)
+                    }
+                    if !originalText.vehicleDescription.trimmedIsEmpty {
+                        originalTextRow("Fahrzeugbeschreibung", value: originalText.vehicleDescription)
+                    }
+                    if !originalText.witnesses.trimmedIsEmpty {
+                        originalTextRow("Zeugen", value: originalText.witnesses)
+                    }
+                }
                 Section {
                     TextField("Bereich oder Ort im Objekt", text: $translation.location)
                     TextField("Meldegrund", text: $translation.violation)
@@ -922,7 +1007,7 @@ private struct TranslationReviewView: View {
                         TextField("Zeugen", text: $translation.witnesses)
                     }
                 } header: {
-                    Text("Übersetzte Angaben prüfen")
+                    Text("Übersetzung bearbeiten")
                 } footer: {
                     Text("Du kannst die lokale Übersetzung vor der PDF-Erstellung korrigieren. Die Zielsprachenseite bleibt als KI-übersetzt gekennzeichnet; verbindlich ist die deutsche Originalfassung.")
                 }
@@ -938,6 +1023,17 @@ private struct TranslationReviewView: View {
                 }
             }
         }
+    }
+
+    private func originalTextRow(_ title: LocalizedStringKey, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .textSelection(.enabled)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -960,6 +1056,10 @@ private enum ReportStep: Int, CaseIterable {
 }
 
 private extension String {
+    var trimmedIsEmpty: Bool {
+        trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var nonEmpty: String? {
         let value = trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? nil : value
