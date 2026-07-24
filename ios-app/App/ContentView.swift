@@ -376,7 +376,7 @@ private struct NewReportView: View {
             requiredTextField("Bereich oder Ort im Objekt", text: $garageLocation)
             DatePicker("Beobachtet am", selection: $incidentAt)
         }
-        Section(category.expectsVehicle ? "Fahrzeug und Vorfall" : "Vorfall") {
+        Section {
             if category.expectsVehicle {
                 requiredTextField("Kennzeichen", text: $licensePlate)
                     .textInputAutocapitalization(.characters)
@@ -386,6 +386,8 @@ private struct NewReportView: View {
             TextField("Sachliche Beschreibung (optional)", text: $notes, axis: .vertical)
                 .lineLimit(3...8)
             TextField("Zeugen (optional)", text: $witnesses)
+        } header: {
+            Text(category.expectsVehicle ? "Fahrzeug und Vorfall" : "Vorfall")
         } footer: {
             Text("Mit * gekennzeichnete Felder sind Pflichtfelder.")
         }
